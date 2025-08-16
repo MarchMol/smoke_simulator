@@ -18,6 +18,7 @@ typedef struct{
 
     // Other constants
     float buoyancy_coeff;
+    float conf_strenght;
 
 } Data;
 

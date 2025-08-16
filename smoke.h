@@ -9,7 +9,7 @@ void simulation_step(
     float **density_buffer,
 
     float **b,
-    float **buoyancy,
+    float ***forces,
 
     float ***velocity,
     float ***velocity_buffer,

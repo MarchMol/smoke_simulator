@@ -8,7 +8,7 @@ extern float **density;
 extern float **density_buffer;
 
 extern float **b;
-extern float **buoyancy;
+extern float ***forces;
 
 extern float ***velocity;
 extern float ***velocity_buffer;
