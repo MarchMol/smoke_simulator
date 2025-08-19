@@ -329,7 +329,7 @@ void correct_velocity(
     float h = data->h;
     for(int i = 1; i<x-1; i++){
         for(int j = 1; j<y-1; j++){
-            velocity[i][j][0] = 
+            velocity[i][j][0] -= 
                 (dt/(2.0f*h)) *
                 (pressure[i+1][j] - pressure[i-1][j])
             ;
@@ -359,15 +359,14 @@ void update_forces(
     for(int i = 1; i<x-1; i++){
         for(int j = 1; j<y-1; j++){
             // w = ∇U / 2*h
-            w = (
-                velocity[i+1][j][0] - velocity[i-1][j][0]
-            )/(2*h) -
-            (
-                velocity[i][j+1][1] - velocity[i][j-1][1]
-            )/(2*h);
+            w = 
+            ( velocity[i+1][j][0] - velocity[i-1][j][0])/
+            (2*h) -
+            ( velocity[i][j+1][1] - velocity[i][j-1][1]) /
+            (2*h);
 
             // |w| = abs(w)
-            buffer_scalar[i][j] = fabs(w);
+            buffer_scalar[i][j] = fabsf(w);
         }
     }
     // ∇|w|
@@ -384,8 +383,8 @@ void update_forces(
                 buffer_scalar[i][j+1] - buffer_scalar[i][j-1]
             )/(2*h);
 
-            mag_w = sqrt(wx*wx + wy*wy);
-            if(mag_w < 0) mag_w = 1e-12;
+            mag_w = sqrtf(wx*wx + wy*wy);
+            if(mag_w <= 0) mag_w = 1e-12;
 
             buffer_vec[i][j][0] = wx/mag_w;
             buffer_vec[i][j][1] = wy/mag_w;
@@ -404,9 +403,7 @@ void update_forces(
             // fy = - eps * h (Nx X w)
             forces[i][j][1] = (
                 - eps * h * buffer_vec[i][j][0] * buffer_scalar[i][j]
-            ) +
-            // Buoyanci
-                alpha*density[i][j]
+            ) +  alpha*density[i][j] // Buoyancy
 
             ;
         }
@@ -459,6 +456,9 @@ void simulation_step(
     // }
     // printf("\n");
     // printf("Started...\n");
+
+    // printf("Entered:\n");
+    // print_all(0, forces, velocity, density, pressure, &data);
     update_forces(
         velocity,
         forces,
@@ -500,5 +500,7 @@ void simulation_step(
         pressure,
         &data
     );
-
+    // printf("After calculations:\n");
+    // print_all(0, forces, velocity, density, pressure, &data);
+    // printf("EXITINT\n");
 }

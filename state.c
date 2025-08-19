@@ -3,8 +3,8 @@
 #include "data.h"
 #include "state.h"
 
-int X = 300;
-int Y = 300;
+int X = 600;
+int Y = 600;
 
 float **pressure;
 float **pressure_buffer;
