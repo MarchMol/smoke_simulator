@@ -9,6 +9,7 @@ typedef struct{
 
     // Sim parameters
     float dt;
+    float threshold;
     int jacobi_iter;
     
     // Smoke Constants

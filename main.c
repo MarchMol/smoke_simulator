@@ -10,8 +10,8 @@
 #include "smoke.h"
 
 // Display
-#define WIDTH 600
-#define HEIGHT 600
+#define WIDTH 200
+#define HEIGHT 200
 FILE *stream;
 
 typedef struct {
@@ -24,12 +24,6 @@ float lerp(float a, float b, float t) {
 
 Color colormap(float t) {
     Color c;
-    if(t < 1e-2){
-        c.r = 1.0f;
-        c.g = 1.0f;
-        c.b = 1.0f;
-        return c;  
-    }
     if (t < 0.33f) {
         // Blue → Green
         float local = t / 0.33f;
@@ -96,14 +90,14 @@ int render(
     int inc_dec = 5; // 0-> increas, 1->decrease
     glfwMakeContextCurrent(window);
     while (!glfwWindowShouldClose(window)) {
+        clock_t start = clock();
         glClear(GL_COLOR_BUFFER_BIT);
         if(counter % 150 == 1){
             for(int a_i = -emission_area; a_i< emission_area; a_i++){
                 for(int a_j = -emission_area; a_j< emission_area; a_j++){
                     density[source_x + a_i][source_y + a_j]+=emission_rate;
-                    pressure[source_x + a_i][source_y + a_j]+0.1f;
-                    velocity[source_x + a_i][source_y + a_j][1] += 200.0f;
-                    velocity[source_x + a_i][source_y + a_j][0] += 10.0f;
+                    velocity[source_x + a_i][source_y + a_j][1] = 150.0f + random_float(-20.0f,20.0f);
+                    velocity[source_x + a_i][source_y + a_j][0] = random_float(-20.0f,20.0f);;
                 }
             }
         }
@@ -126,6 +120,13 @@ int render(
         glfwSwapBuffers(window);
         glfwPollEvents();
         counter++;
+        clock_t end = clock();
+        double elapsed_sec = (double)(end - start) / CLOCKS_PER_SEC;
+        if(counter %5 == 0){
+            clock_t end = clock();
+            double elapsed_sec = (double)(end - start) / CLOCKS_PER_SEC;
+            printf("FPS %.3f\n",1.0f/elapsed_sec);
+        }
     }
 
     glfwTerminate();
@@ -150,12 +151,12 @@ int main() {
     data.y = HEIGHT;
     data.h = 10.0f;
     data.dt = 0.05f;
-    data.jacobi_iter = 40;
+    data.jacobi_iter = 100;
     data.viscosity = 0.01f;
     data.scalar_diffusion = 0.01f;
     data.buoyancy_coeff = 1.0f;
     data.conf_strenght = 1.0f;
-    int emission_area = 100;
+    int emission_area = WIDTH/10;
     
     float emission_rate =0.8f;
     // stream = freopen("bin/output.txt", "w", stdout);
