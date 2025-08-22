@@ -3,8 +3,6 @@
 #include "data.h"
 #include "state.h"
 
-int X = 200;
-int Y = 200;
 
 float **pressure;
 float **pressure_buffer;
@@ -18,7 +16,7 @@ float ***forces;
 float ***velocity;
 float ***velocity_buffer;
 
-void allocate_arrays(){
+void allocate_arrays(int X, int Y){
     // Velocity allocation
     velocity = malloc(X * sizeof(float**));
     velocity_buffer = malloc(X * sizeof(float**));
@@ -71,7 +69,7 @@ void allocate_arrays(){
     }
 }
 
-void free_arrays(){
+void free_arrays(int X, int Y){
     // Free velocity
     for(int i = 0; i < X; i++) {
         for(int j = 0; j < Y; j++) {

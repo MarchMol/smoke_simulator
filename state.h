@@ -12,9 +12,8 @@ extern float ***forces;
 
 extern float ***velocity;
 extern float ***velocity_buffer;
-extern int X, Y;
 
-void allocate_arrays(void);
-void free_arrays(void);
+void allocate_arrays(int X, int Y);
+void free_arrays(int X, int Y);
 
 #endif
