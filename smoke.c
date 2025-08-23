@@ -414,7 +414,7 @@ void simulation_step(
     float ***velocity,
     float ***velocity_buffer,
 
-    Data data
+    Data *data
 
 ){
     update_forces(
@@ -422,18 +422,18 @@ void simulation_step(
         forces,
         velocity_buffer,
         density_buffer,
-        &data
+        data
     );
     density_steps(
         velocity,
         density,
         density_buffer,
-        &data
+        data
     );
     velocity_steps(
         velocity,
         velocity_buffer,
-        &data
+        data
     );
     pressure_projection(
         pressure,
@@ -441,12 +441,12 @@ void simulation_step(
         b,
         density,
         velocity,
-        &data
+        data
     );
     correct_velocity(
         velocity,
         density,
         pressure,
-        &data
+        data
     );
 }

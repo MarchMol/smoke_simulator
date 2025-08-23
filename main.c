@@ -23,6 +23,36 @@
 FILE *stream;
 
 typedef struct {
+    int mode;
+    int shader;
+} VisData;
+
+typedef struct {
+    int dis_width;
+    int dis_height;
+    int grid_width;
+    int grid_height;
+} DisplayParams;
+
+typedef struct {
+    // 0 -> square
+    // 1-> circle
+    // 2 -> random??
+    int shape;
+    // Bounds
+    int min_x;
+    int max_x;
+    int min_y;
+    int max_y;
+
+    // Shape generation
+    int amount_shapes;
+    int emission_area;
+    float emission_rate;
+    float emmision_velocity_factor;
+} InitialCondition;
+
+typedef struct {
     float r, g, b;
 } Color;
 
@@ -61,29 +91,83 @@ float rand_float(float min, float max) {
 }
 
 
-
 void write_to_window(
     float **density,
-    unsigned char *framebuffer
+    unsigned char *framebuffer,
+    VisData *vis_data,
+    DisplayParams *dis_par
 ){
-    double x_ratio = GRID_WIDTH / DISPLAY_WIDTH;
-    double y_ratio = GRID_HEIGHT / DISPLAY_HEIGHT;
-    for(int i = 0; i < DISPLAY_WIDTH; i++){
-        for(int j = 0; j < DISPLAY_HEIGHT; j++){
+    int grid_width = dis_par->grid_width;
+    int grid_height = dis_par->grid_height;
+    int display_width = dis_par->dis_width;
+    int display_height = dis_par->dis_height;
+
+
+    for(int i = 0; i < display_width; i++){
+        for(int j = 0; j < display_height; j++){
             // Round index
-            int x_orig = (int)round( i * GRID_WIDTH / DISPLAY_WIDTH);
-            int y_orig = (int)round( j * GRID_HEIGHT / DISPLAY_HEIGHT);
+            int x_orig = (int)round( i * grid_width / display_width);
+            int y_orig = (int)round( j * grid_height / display_height);
+
             // Get density
             float density_val = density[x_orig][y_orig];
             if(density_val > 1.0f) density_val = 1.0f;
             if(density_val < 0.0f) density_val = 0.0f;
 
-            // Shader (lerp)
+            // Shader
+            int fb_index = (j * display_width + i) * 3;
+            if(vis_data->shader == 0){ // Grayscale
+                framebuffer[fb_index + 0] = (unsigned char)(density_val* 255.0f);
+                framebuffer[fb_index + 1] = (unsigned char)(density_val* 255.0f);
+                framebuffer[fb_index + 2] = (unsigned char)(density_val* 255.0f);
+            } else if (vis_data->shader == 1){
+                framebuffer[fb_index + 0] = (unsigned char)((1.0f-density_val)* 255.0f);
+                framebuffer[fb_index + 1] = (unsigned char)((1.0f-density_val)* 255.0f);
+                framebuffer[fb_index + 2] = (unsigned char)((1.0f-density_val)* 255.0f);
+            } else {
+                Color c = colormap(density_val);
+                framebuffer[fb_index + 0] = (unsigned char)(c.r* 255.0f);
+                framebuffer[fb_index + 1] = (unsigned char)(c.g* 255.0f);
+                framebuffer[fb_index + 2] = (unsigned char)(c.b* 255.0f);
+            }
             // Write to buffer
-            int fb_index = (j * DISPLAY_WIDTH + i) * 3;
-            framebuffer[fb_index + 0] = (unsigned char)(density_val* 255.0f);
-            framebuffer[fb_index + 1] = (unsigned char)(density_val* 255.0f);
-            framebuffer[fb_index + 2] = (unsigned char)(density_val* 255.0f);
+            
+
+        }
+    }
+}
+
+void apply_condition(
+    InitialCondition *init_cond
+){
+    int amount = init_cond->amount_shapes;
+    for( int q = 0; q <amount; q++){
+        // Random source between bounds
+        int x_s = init_cond->min_x + rand() % ( init_cond->max_x - init_cond->min_x);
+        int y_s = init_cond->min_y + rand() % ( init_cond->max_y - init_cond->min_y);
+        int emission_area = init_cond->emission_area;
+        int shape = init_cond->shape;
+        float emission_rate = init_cond->emission_rate;
+        float vel_factor = init_cond->emmision_velocity_factor;
+
+        double theta = ((double)rand() / RAND_MAX) * 2.0 * M_PI;
+        float dir_x = (float)cos(theta);
+        float dir_y = (float)sin(theta);
+
+        for(int a_i = -emission_area; a_i< emission_area; a_i++){
+            for(int a_j = -emission_area; a_j< emission_area; a_j++){
+                if(shape == 0){ // Square
+                    density[x_s + a_i][y_s + a_j]+= emission_rate;
+                    velocity[x_s + a_i][y_s + a_j][0] += vel_factor * dir_x;
+                    velocity[x_s + a_i][y_s + a_j][1] += vel_factor* dir_y;
+                } else if (shape == 1){ // Circle
+                    if (a_i*a_i + a_j*a_j <= emission_area*emission_area) {
+                        density[x_s + a_i][y_s + a_j]+= emission_rate;
+                        velocity[x_s + a_i][y_s + a_j][0] += vel_factor * dir_x;
+                        velocity[x_s + a_i][y_s + a_j][1] += vel_factor * dir_y;
+                    }
+                }
+            }   
         }
     }
 }
@@ -91,55 +175,28 @@ void write_to_window(
 int render(
     GLFWwindow* window,
     unsigned char *framebuffer,
-    int emission_area,
-    float emission_rate,
-    Data data
+    DisplayParams *dis_par,
+    VisData *vis_data,
+    InitialCondition *init_cond,
+    Data *data
 ){
-
     int counter = 0;
-    int min_x = emission_area;
-    int max_x = GRID_WIDTH - emission_area;
-    int min_y = emission_area;
-    int max_y = GRID_HEIGHT - emission_area;
-
     glfwMakeContextCurrent(window);
     while (!glfwWindowShouldClose(window)) {
         clock_t start = clock();
-
         // Clear buffer
         glClear(GL_COLOR_BUFFER_BIT);
-
        // Add source of fluid
-        // if(counter % 20 == 1){
-        if(counter == 0){
-            for( int q = 0; q < 10; q++){
-                int x_s = min_x + rand() % ( max_x - min_x);
-                int y_s = min_y + rand() % ( max_y - min_y);
-
-
-                double theta = ((double)rand() / RAND_MAX) * 2.0 * M_PI;
-                float dir_x = (float)cos(theta);
-                float dir_y = (float)sin(theta);
-
-                for(int a_i = -emission_area; a_i< emission_area; a_i++){
-                    for(int a_j = -emission_area; a_j< emission_area; a_j++){
-                          if (a_i*a_i + a_j*a_j <= emission_area*emission_area) {
-                            density[x_s + a_i][y_s + a_j]+= emission_rate;
-                            velocity[x_s + a_i][y_s + a_j][0] += 150.0f * dir_x;
-                            velocity[x_s + a_i][y_s + a_j][1] += 150.0f* dir_y;
-                          }
-                    }
-                }
-            }
+        if (counter == 0){
+            apply_condition(init_cond);
         }
-
         // Simulate next step
         simulation_step(pressure, pressure_buffer, density, density_buffer, b, forces, velocity, velocity_buffer, data);
         // Write to framebuffer
-        write_to_window(density, framebuffer);
+        write_to_window(density, framebuffer, vis_data, dis_par);
         
         // Framebuffer to window
-        glDrawPixels(DISPLAY_WIDTH, DISPLAY_HEIGHT, GL_RGB, GL_UNSIGNED_BYTE, framebuffer);
+        glDrawPixels(dis_par->dis_width, dis_par->dis_height, GL_RGB, GL_UNSIGNED_BYTE, framebuffer);
         glfwSwapBuffers(window);
         glfwPollEvents();
 
@@ -158,39 +215,154 @@ int render(
     return 0;
 }
 
+
+void parse_config(
+    Data *data,
+    DisplayParams *dis_par,
+    InitialCondition *init_cond,
+    VisData *vis_data
+){
+    // Open config file
+    FILE *f = fopen("config.txt", "r");
+
+    // Temporal buffers
+    char line[512];
+    float ratio = 1.0f;
+    char shape[64];
+    char mode[64];
+    char shader[64];
+    float area_factor;
+    float vel_factor;
+
+    while (fgets(line, sizeof(line), f)) {
+        // Sim data
+        if (sscanf(line, "h = %f", &data->h) == 1) continue;
+        if (sscanf(line, "dt = %f", &data->dt) == 1) continue;
+        if (sscanf(line, "jacobi_iter = %d", &data->jacobi_iter) == 1) continue;
+        if (sscanf(line, "viscosity = %f", &data->viscosity) == 1) continue;
+        if (sscanf(line, "scalar_diffusion = %f", &data->scalar_diffusion) == 1) continue;
+        if (sscanf(line, "buoyancy_coeff = %f", &data->buoyancy_coeff) == 1) continue;
+        if (sscanf(line, "conf_strenght = %f", &data->conf_strenght) == 1) continue;
+        
+        // Display data
+        if (sscanf(line, "display_width = %d", &dis_par->dis_width) == 1) continue;
+        if (sscanf(line, "display_height = %d", &dis_par->dis_height) == 1) continue;
+        if (sscanf(line, "grid_ratio = %f", &ratio) == 1) continue;
+
+        // // Initial condition
+        if (sscanf(line, "shape = %63s", &shape) == 1) continue;
+        if (sscanf(line, "amount_shapes = %d", &init_cond->amount_shapes) == 1) continue;
+        if (sscanf(line, "emission_area = %f", &area_factor) == 1) continue;
+        if (sscanf(line, "emission_rate = %f", &init_cond->emission_rate) == 1) continue;
+        if (sscanf(line, "emmision_velocity_factor = %f", &vel_factor) == 1) continue;
+
+        // Visualization
+        if (sscanf(line, "mode = %63s", &mode) == 1) continue;
+        if (sscanf(line, "shader = %63s", &shader) == 1) continue;
+    }
+    int x =  (int)roundf(dis_par->dis_width * ratio);
+    int y =  (int)roundf(dis_par->dis_height * ratio);
+    dis_par->grid_width = x;
+    dis_par->grid_height= y;
+    data->x = x;
+    data->y = y;
+
+    // Mode
+    if (strcmp(mode, "2d") == 0) {
+        vis_data->mode = 0;
+    } else if (strcmp(mode, "3d") == 0) {
+        vis_data->mode = 1;
+    }
+    // Shader
+    if (strcmp(shader, "grayscale") == 0) {
+        vis_data->shader = 0;
+    } else if (strcmp(shader, "gray_inverted") == 0) {
+        vis_data->shader= 1;
+    } else if (strcmp(shader, "lerp") == 0) {
+        vis_data->shader= 2;
+    }
+
+    // Init cond
+    if (strcmp(shape, "square") == 0) {
+        init_cond->shape = 0;
+    } else if (strcmp(shape, "circle") == 0) {
+        init_cond->shape = 1;
+    } else if (strcmp(shape, "rand") == 0) {
+        init_cond->shape = 2;
+    }
+    init_cond->emission_area = (int)roundf(max(x, y)*area_factor);
+    init_cond->min_x = init_cond->emission_area;
+    init_cond->max_x = x - init_cond->emission_area;
+    init_cond->min_y = init_cond->emission_area;
+    init_cond->max_y = y - init_cond->emission_area;
+    init_cond->emmision_velocity_factor = vel_factor * max(x, y);
+
+
+    // // Data check
+    printf("# Data #\n");
+    printf("\t X: %f \n",data->x);
+    printf("\t Y: %f \n",data->y);
+    printf("\t h: %f \n",data->h);
+    printf("\t dt: %f \n",data->dt);
+    printf("\t jacobi_iter: %d \n",data->jacobi_iter);
+    printf("\t viscosity: %f \n",data->viscosity);
+    printf("\t scalar_diffusion: %f \n",data->scalar_diffusion);
+    printf("\t buoyancy_coeff: %f \n",data->buoyancy_coeff);
+    printf("\t conf_strenght: %f \n\n",data->conf_strenght);
+
+    // // Display
+    printf("# Display #\n");
+    printf("\t Display Width: %d \n",dis_par->dis_width);
+    printf("\t Display Height: %d \n",dis_par->dis_height);
+    printf("\t Grid Width: %d \n",dis_par->grid_width);
+    printf("\t Grid Height: %d \n",dis_par->grid_height);
+    
+    // // Initial Condition
+    printf("# Initial Condition #\n");
+    printf("\t Shape: %d \n",init_cond->shape);
+    printf("\t amount shapes: %d \n",init_cond->amount_shapes);
+    printf("\t emission area: %d \n",init_cond->emission_area);
+    printf("\t emission rate: %f \n",init_cond->emission_rate);
+    printf("\t velocity factor: %f \n",init_cond->emmision_velocity_factor);
+    printf("\t X Bounds: (%d, %d) \n",init_cond->min_x, init_cond->max_x);
+    printf("\t Y Bounds: (%d, %d) \n",init_cond->min_y, init_cond->max_y);
+    
+
+    // printf("# Visualization #\n");
+    printf("\t mode: %d \n",vis_data->mode);
+    printf("\t shader: %d \n",vis_data->shader);
+    
+    fclose(f);
+}
+
 int main() {
+    // Init data
+    Data data;
+    DisplayParams dis_par;
+    InitialCondition init_cond;
+    VisData vis_data;
+
+    // Fetch config data
+    parse_config(&data, &dis_par, &init_cond, &vis_data);
 
     // Display Init
     if (!glfwInit())
         return -1;
 
     GLFWwindow* window = glfwCreateWindow(
-        DISPLAY_WIDTH, DISPLAY_HEIGHT, "Fluid SImulation", NULL, NULL
+        dis_par.dis_width, dis_par.dis_height, "Fluid SImulation", NULL, NULL
     );
-
     if (!window) {
         glfwTerminate();
         return -1;
     }
-    unsigned char *framebuffer = malloc(DISPLAY_WIDTH * DISPLAY_HEIGHT * 3);
-
+    unsigned char *framebuffer = malloc(dis_par.dis_width * dis_par.dis_height * 3);
 
     // Simulation Init
-    allocate_arrays(GRID_WIDTH, GRID_HEIGHT);
-    Data data;
-    data.x = GRID_WIDTH;
-    data.y = GRID_HEIGHT;
-    data.h = 10.0f;
-    data.dt = 0.05f;
-    data.jacobi_iter = 100;
-    data.viscosity = 0.01f;
-    data.scalar_diffusion = 0.01f;
-    data.buoyancy_coeff = 1.0f;
-    data.conf_strenght = 1.0f;
-    int emission_area = GRID_WIDTH/10;
-    
-    float emission_rate =0.8f;
-    render(window, framebuffer, emission_area, emission_rate, data);
+    allocate_arrays(dis_par.grid_width, dis_par.grid_height);
+
+    // Rendering
+    render(window, framebuffer, &dis_par, &vis_data, &init_cond, &data);
     free_arrays(GRID_WIDTH, GRID_HEIGHT);
 
     return 0;

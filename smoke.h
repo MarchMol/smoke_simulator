@@ -14,7 +14,7 @@ void simulation_step(
     float ***velocity,
     float ***velocity_buffer,
 
-    Data data);
+    Data *data);
 
 
 #endif
