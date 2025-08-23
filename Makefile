@@ -12,7 +12,7 @@ LIBS = -lglfw3 -lopengl32 -lgdi32
 OUT = bin/main.exe
 
 # Source files
-SRC = $(wildcard *.c)
+SRC = $(wildcard src/*.c)
 
 # Default target
 all: compile

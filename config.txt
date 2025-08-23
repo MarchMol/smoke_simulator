@@ -30,4 +30,4 @@ emmision_velocity_factor = 0.75
 #  2d or 3d
 mode = 2d
 # grayscale | gray_inverted | lerp
-shader = lerp
+shader = grayscale
