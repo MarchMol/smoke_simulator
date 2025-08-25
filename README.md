@@ -42,15 +42,24 @@ Set-Alias make "C:\msys64\mingw64\bin\mingw32-make.exe"
 
 ## Running
 ### Usando Make
-La idea del make era que hiciera todo mas facil, entonces si ya tienen make set up como lo puse antes solo tienen que correr
+**Correr Secuencial**
 ```
-make compile
+make seq
 ```
 y para correr
 ```
-make run
+make run-seq
 ```
-### Manual
+**Correr Paralelo**
+```
+make omp
+```
+y para correr
+```
+make run-omp
+```
+
+### Manual Secuencial
 Si les pelo make, pueden hacerlo manual obvio, solo que necesitan correr lo siguiente.
 ```
 gcc main.c -Iinclude -Llib -lglfw3 -lopengl32 -lgdi32 -o bin/main.exe
