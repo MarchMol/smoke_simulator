@@ -18,6 +18,16 @@
 #define GRID_WIDTH 200
 #define GRID_HEIGHT 200
 
+// Performance monitoring
+typedef struct {
+    double total_time;
+    double min_fps;
+    double max_fps;
+    double avg_fps;
+    int frame_count;
+    clock_t last_time;
+} PerformanceMetrics;
+
 // Initial conditions
 
 FILE *stream;
@@ -85,7 +95,35 @@ Color colormap(float t) {
     }
     return c;
 }
+// Optimized performance monitoring
+static PerformanceMetrics perf = {0};
 
+void init_performance_monitor() {
+    perf.total_time = 0.0;
+    perf.min_fps = 1000.0;
+    perf.max_fps = 0.0;
+    perf.avg_fps = 0.0;
+    perf.frame_count = 0;
+    perf.last_time = clock();
+}
+void update_performance_metrics(double current_fps) {
+    perf.frame_count++;
+    perf.total_time += 1.0 / current_fps;
+    
+    if (current_fps < perf.min_fps) perf.min_fps = current_fps;
+    if (current_fps > perf.max_fps) perf.max_fps = current_fps;
+    perf.avg_fps = perf.frame_count / perf.total_time;
+}
+
+void print_performance_summary() {
+    printf("\n=== Performance Summary ===\n");
+    printf("Total frames: %d\n", perf.frame_count);
+    printf("Average FPS: %.2f\n", perf.avg_fps);
+    printf("Min FPS: %.2f\n", perf.min_fps);
+    printf("Max FPS: %.2f\n", perf.max_fps);
+    printf("Total simulation time: %.2f seconds\n", perf.total_time);
+    printf("===========================\n");
+}
 float rand_float(float min, float max) {
     return min + ((float)rand() / RAND_MAX) * (max - min);
 }
@@ -180,6 +218,7 @@ int render(
     InitialCondition *init_cond,
     Data *data
 ){
+    init_performance_monitor();
     int counter = 0;
     glfwMakeContextCurrent(window);
     while (!glfwWindowShouldClose(window)) {
@@ -201,16 +240,25 @@ int render(
         glfwPollEvents();
 
         // fps
-        counter++;
         clock_t end = clock();
         double elapsed_sec = (double)(end - start) / CLOCKS_PER_SEC;
+        double current_fps = 1.0 / elapsed_sec;
+        update_performance_metrics(current_fps);
+        counter++;
         if(counter %5 == 0){
             clock_t end = clock();
             double elapsed_sec = (double)(end - start) / CLOCKS_PER_SEC;
-            printf("FPS %.3f\n",1.0f/elapsed_sec);
+            //printf("FPS %.3f\n",1.0f/elapsed_sec);
+             printf("Frame %d - FPS: %.1f (Avg: %.1f)\n", 
+                   counter, current_fps, perf.avg_fps);
+        }
+        // Emergency exit for performance testing
+        if (counter >= 200) {
+            printf("Completed 200 frames for performance testing.\n");
+            break;
         }
     }
-
+    print_performance_summary();
     glfwTerminate();
     return 0;
 }

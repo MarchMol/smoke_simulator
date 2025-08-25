@@ -110,7 +110,7 @@ void update_forces(
     float h = data->h;
     float dt = data->dt;
     // 1. Calculte Vorticity index 
-    #pragma omp parallel for schedule(static) if((x-2)*(y-2) > 5000)
+    #pragma omp parallel for schedule(static) 
     for(int i = 1; i<x-1; i++){
         for(int j = 1; j<y-1; j++){
             //      w = (∂U / ∂x)  ​− (∂U / ∂y)​
@@ -129,7 +129,7 @@ void update_forces(
     // 2. Calculate ∇|w| and resulting force
     float alpha = data->buoyancy_coeff;
     float eps_h = data->conf_strenght * h;
-    #pragma omp parallel for schedule(static) if((x-2)*(y-2) > 5000)
+    #pragma omp parallel for schedule(static) 
     for(int i = 1; i<x-1; i++){
         for(int j = 1; j<y-1; j++){
             float wx = (
@@ -173,7 +173,7 @@ void density_steps(
     // 1. Advection
 
     copy_scalar(density_buffer, density, data);
-    #pragma omp parallel for schedule(static) if((x-2)*(y-2) > 5000)
+    #pragma omp parallel for schedule(static) 
     for(int i = 1; i<=x-1; i++){
         for(int j = 1; j<=y-1; j++){
             float x_prev = i - (dt * velocity[i][j][0])/h;
@@ -211,7 +211,7 @@ void density_steps(
     float alpha = (scalar_diffusion*dt)/(h*h);
     for(int jac =0; jac<jacobi_iter;jac++){
         // Solo paralelizar si es beneficioso
-        #pragma omp parallel for schedule(static) if((x-2)*(y-2) > 5000)
+        #pragma omp parallel for schedule(static) 
         for(int i = 1; i<x-1; i++){
              for(int j = 1; j<y-1; j++){
                 density[i][j] = 
@@ -306,7 +306,7 @@ void velocity_steps(
     copy_vec(velocity_buffer, velocity, data);
     float alpha = (viscosity*dt)/(h*h);
     for(int jac = 0; jac<jacobi_iter; jac++){
-        #pragma omp parallel for schedule(static) if((x-2)*(y-2) > 5000)
+        #pragma omp parallel for schedule(static) 
         for(int i = 1; i<x-1; i++){
             for(int j = 1; j<y-1; j++){
                 velocity[i][j][0] = 
@@ -353,7 +353,7 @@ void pressure_projection(
     float h = data->h;
     int jacobi_iter = data->jacobi_iter;
     // Calculate b (solution)
-    #pragma omp parallel for schedule(static) if((x-2)*(y-2) > 5000)
+    #pragma omp parallel for schedule(static) 
     for(int i = 1; i<x-1;i++){
         for(int j = 1; j<y-1; j++){
             // b = (ρ/Δt) * ∇u
@@ -368,7 +368,7 @@ void pressure_projection(
     // Poisson pressure equations
     copy_scalar(pressure_buffer, pressure, data);
     for(int jac =0;jac<jacobi_iter;jac++){
-        #pragma omp parallel for schedule(static) if((x-2)*(y-2) > 5000)
+        #pragma omp parallel for schedule(static) 
         for(int i = 1; i<x-1; i++){
             for(int j = 1; j<y-1; j++){
                 // P^n+1 = (1/4)*
@@ -404,7 +404,7 @@ void correct_velocity(
     float dt = data->dt;
     float h = data->h;
     // Solo paralelizar si es beneficioso
-    #pragma omp parallel for schedule(static) if((x-2)*(y-2) > 5000)
+    #pragma omp parallel for schedule(static) 
     for(int i = 1; i<x-1; i++){
         for(int j = 1; j<y-1; j++){
             velocity[i][j][0] -= 
