@@ -411,7 +411,7 @@ int main() {
 
     // Rendering
     render(window, framebuffer, &dis_par, &vis_data, &init_cond, &data);
-    free_arrays(GRID_WIDTH, GRID_HEIGHT);
+    free_arrays(dis_par.grid_width, dis_par.grid_height);
 
     return 0;
 
