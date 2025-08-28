@@ -9,6 +9,8 @@
 #include "state.h"
 #include "data.h"
 #include "smoke.h"
+#include <omp.h>
+#include <xmmintrin.h>
 
 // Display
 #define DISPLAY_WIDTH 900
@@ -17,6 +19,15 @@
 // Simulation
 #define GRID_WIDTH 200
 #define GRID_HEIGHT 200
+
+static inline int choose_threads_for(const Data *data) {
+    long long cells = (long long)data->x * (long long)data->y;
+    int max_t = omp_get_max_threads();
+    if (cells < 20000)   return 1;
+    if (cells < 40000)   return max_t > 2 ? 2 : 1;
+    if (cells < 200000)  return max_t > 4 ? 4 : max_t;
+    return max_t;
+}
 
 // Performance monitoring
 typedef struct {
@@ -107,6 +118,7 @@ void init_performance_monitor() {
     perf.last_time = clock();
 }
 void update_performance_metrics(double current_fps) {
+    if (current_fps < 1e-3) current_fps = 1e-3; // evita infinitos/negativos
     perf.frame_count++;
     perf.total_time += 1.0 / current_fps;
     
@@ -144,8 +156,8 @@ void write_to_window(
     for(int i = 0; i < display_width; i++){
         for(int j = 0; j < display_height; j++){
             // Round index
-            int x_orig = (int)round( i * grid_width / display_width);
-            int y_orig = (int)round( j * grid_height / display_height);
+            int x_orig = (int)round( i * (grid_width-1)) / (display_width-1);
+            int y_orig = (int)round( j * (grid_width-1)) / (display_width-1);
 
             // Get density
             float density_val = density[x_orig][y_orig];
@@ -218,46 +230,55 @@ int render(
     InitialCondition *init_cond,
     Data *data
 ){
+        // OpenMP: equipo estable y afinidad
+        omp_set_dynamic(0);
+        omp_set_max_active_levels(1);
+        #if defined(_OPENMP) && (_OPENMP>=200805)
+        omp_set_schedule(omp_sched_static, 0);
+        #endif
+        #ifdef _WIN32
+        _putenv_s("OMP_PROC_BIND","close");
+        _putenv_s("OMP_PLACES","cores");
+        #endif
+        omp_set_num_threads( choose_threads_for(data) ); // usa tu helper en smoke_parallel.c
     init_performance_monitor();
     int counter = 0;
     glfwMakeContextCurrent(window);
-    while (!glfwWindowShouldClose(window)) {
-        clock_t start = clock();
-        // Clear buffer
-        glClear(GL_COLOR_BUFFER_BIT);
-       // Add source of fluid
-        if (counter == 0){
-            apply_condition(init_cond);
-        }
-        // Simulate next step
-        simulation_step(pressure, pressure_buffer, density, density_buffer, b, forces, velocity, velocity_buffer, data);
-        // Write to framebuffer
-        write_to_window(density, framebuffer, vis_data, dis_par);
-        
-        // Framebuffer to window
-        glDrawPixels(dis_par->dis_width, dis_par->dis_height, GL_RGB, GL_UNSIGNED_BYTE, framebuffer);
-        glfwSwapBuffers(window);
-        glfwPollEvents();
+    glfwSwapInterval(0);
+        while (!glfwWindowShouldClose(window)) {
+            double t0 = glfwGetTime();
+            // Clear buffer
+                glClear(GL_COLOR_BUFFER_BIT);
+                // Add source of fluid
+                if (counter == 0){
+                    apply_condition(init_cond);
+                }
+            // Simulate next step
+            simulation_step(pressure, pressure_buffer, density, density_buffer, b, forces, velocity, velocity_buffer, data);
+            // Write to framebuffer
+            write_to_window(density, framebuffer, vis_data, dis_par);
+            
+            // Framebuffer to window
+            glDrawPixels(dis_par->dis_width, dis_par->dis_height, GL_RGB, GL_UNSIGNED_BYTE, framebuffer);
+            glfwSwapBuffers(window);
+            glfwPollEvents();
 
-        // fps
-        clock_t end = clock();
-        double elapsed_sec = (double)(end - start) / CLOCKS_PER_SEC;
-        double current_fps = 1.0 / elapsed_sec;
-        update_performance_metrics(current_fps);
-        counter++;
-        if(counter %5 == 0){
-            clock_t end = clock();
-            double elapsed_sec = (double)(end - start) / CLOCKS_PER_SEC;
-            //printf("FPS %.3f\n",1.0f/elapsed_sec);
-             printf("Frame %d - FPS: %.1f (Avg: %.1f)\n", 
-                   counter, current_fps, perf.avg_fps);
+            // fps
+                double t1 = glfwGetTime();
+                double dt = t1 - t0;
+                if (dt <= 0.0) dt = 1e-9;          // ← blinda delta
+                double current_fps = 1.0 / dt;
+                update_performance_metrics(current_fps);
+                counter++;
+            if (counter % 5 == 0) {
+                printf("Frame %d - FPS: %.1f (Avg: %.1f)\n",
+                    counter, current_fps, perf.avg_fps);
+            }
+            if (counter >= 200) {
+                printf("Completed 200 frames for performance testing.\n");
+                break;
+            }
         }
-        // Emergency exit for performance testing
-        if (counter >= 200) {
-            printf("Completed 200 frames for performance testing.\n");
-            break;
-        }
-    }
     print_performance_summary();
     glfwTerminate();
     return 0;
@@ -411,7 +432,8 @@ int main() {
 
     // Rendering
     render(window, framebuffer, &dis_par, &vis_data, &init_cond, &data);
-    free_arrays(GRID_WIDTH, GRID_HEIGHT);
+    free_arrays(dis_par.grid_width, dis_par.grid_height);
+    free(framebuffer);
 
     return 0;
 
