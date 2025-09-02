@@ -246,6 +246,7 @@ void density_steps(
             #pragma omp barrier
         }
 
+        
 void velocity_steps(
     float ***velocity,
     float ***velocity_buffer,

@@ -222,7 +222,7 @@ int render(
     int counter = 0;
     glfwMakeContextCurrent(window);
     while (!glfwWindowShouldClose(window)) {
-        clock_t start = clock();
+        double t0 = glfwGetTime();
         // Clear buffer
         glClear(GL_COLOR_BUFFER_BIT);
        // Add source of fluid
@@ -240,14 +240,15 @@ int render(
         glfwPollEvents();
 
         // fps
-        clock_t end = clock();
-        double elapsed_sec = (double)(end - start) / CLOCKS_PER_SEC;
-        double current_fps = 1.0 / elapsed_sec;
+        double t1 = glfwGetTime();
+        double dt = t1 - t0;
+        if (dt <= 0.0) dt = 1e-9;
+        double current_fps = 1.0 / dt;
         update_performance_metrics(current_fps);
         counter++;
         if(counter %5 == 0){
-            clock_t end = clock();
-            double elapsed_sec = (double)(end - start) / CLOCKS_PER_SEC;
+            double t1 = glfwGetTime();
+            double elapsed_sec = t1 - t0;
             //printf("FPS %.3f\n",1.0f/elapsed_sec);
              printf("Frame %d - FPS: %.1f (Avg: %.1f)\n", 
                    counter, current_fps, perf.avg_fps);
