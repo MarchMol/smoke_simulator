@@ -3,7 +3,7 @@
 #include "data.h"
 #include "state.h"
 
-
+// Variables globales
 float **pressure;
 float **pressure_buffer;
 
@@ -16,86 +16,110 @@ float ***forces;
 float ***velocity;
 float ***velocity_buffer;
 
+// Bloques contiguos de memoria
+static float *pressure_mem, *pressure_buffer_mem;
+static float *density_mem, *density_buffer_mem;
+static float *b_mem;
+static float *forces_mem;
+static float *velocity_mem, *velocity_buffer_mem;
+
 void allocate_arrays(int X, int Y){
-    // Velocity allocation
+    // ====== VELOCITY (X x Y x 2) ======
     velocity = malloc(X * sizeof(float**));
     velocity_buffer = malloc(X * sizeof(float**));
-    forces = malloc(X * sizeof(float**));
-    for(int i = 0; i<X; i++){
+
+    velocity_mem = malloc(X * Y * 2 * sizeof(float));
+    velocity_buffer_mem = malloc(X * Y * 2 * sizeof(float));
+
+    for(int i = 0; i < X; i++){
         velocity[i] = malloc(Y * sizeof(float*));
         velocity_buffer[i] = malloc(Y * sizeof(float*));
-        forces[i] = malloc(Y * sizeof(float*));
-        for(int j= 0; j<Y; j++){
-            velocity[i][j] = malloc(2 * sizeof(float));
-            velocity_buffer[i][j] = malloc(2 * sizeof(float));
-            forces[i][j] = malloc(2 * sizeof(float));
-        }
-    }
-    // Init
-    for (int i = 0; i < X; i++) {
-        for (int j = 0; j < Y; j++) {
-            forces[i][j][0] = 0.0f;
-            forces[i][j][1] = 0.0f;
-            velocity[i][j][0] = 0.0f;
-            velocity[i][j][1] = 0.0f;
-            velocity_buffer[i][j][0] = 0.0f;
-            velocity_buffer[i][j][1] = 0.0f;
+        for(int j = 0; j < Y; j++){
+            velocity[i][j] = &velocity_mem[(i*Y + j) * 2];
+            velocity_buffer[i][j] = &velocity_buffer_mem[(i*Y + j) * 2];
         }
     }
 
-    // pressure allocation
+    // ====== FORCES (X x Y x 2) ======
+    forces = malloc(X * sizeof(float**));
+    forces_mem = malloc(X * Y * 2 * sizeof(float));
+
+    for(int i = 0; i < X; i++){
+        forces[i] = malloc(Y * sizeof(float*));
+        for(int j = 0; j < Y; j++){
+            forces[i][j] = &forces_mem[(i*Y + j) * 2];
+        }
+    }
+
+    // ====== PRESSURE (X x Y) ======
     pressure = malloc(X * sizeof(float*));
     pressure_buffer = malloc(X * sizeof(float*));
-    density = malloc(X * sizeof(float*));
-    density_buffer = malloc(X * sizeof(float*));
-    b = malloc(X * sizeof(float*));
-    for(int i = 0; i<X; i++){
-        pressure[i] = malloc(Y * sizeof(float));
-        pressure_buffer[i] = malloc(Y * sizeof(float));
-        density[i] = malloc(Y * sizeof(float));
-        density_buffer[i] = malloc(Y * sizeof(float));
-        b[i] = malloc(Y * sizeof(float));
+    pressure_mem = malloc(X * Y * sizeof(float));
+    pressure_buffer_mem = malloc(X * Y * sizeof(float));
+
+    for(int i = 0; i < X; i++){
+        pressure[i] = &pressure_mem[i*Y];
+        pressure_buffer[i] = &pressure_buffer_mem[i*Y];
     }
 
-    // Init
-        for (int i = 0; i < X; i++) {
-        for (int j = 0; j < Y; j++) {
-            pressure[i][j] = 0.0f;
-            pressure_buffer[i][j] = 0.0f;
-            density[i][j] = 0.0f;
-            density_buffer[i][j] = 0.0f;
-            b[i][j] = 0.0f;
-        }
+    // ====== DENSITY (X x Y) ======
+    density = malloc(X * sizeof(float*));
+    density_buffer = malloc(X * sizeof(float*));
+    density_mem = malloc(X * Y * sizeof(float));
+    density_buffer_mem = malloc(X * Y * sizeof(float));
+
+    for(int i = 0; i < X; i++){
+        density[i] = &density_mem[i*Y];
+        density_buffer[i] = &density_buffer_mem[i*Y];
+    }
+
+    // ====== B (X x Y) ======
+    b = malloc(X * sizeof(float*));
+    b_mem = malloc(X * Y * sizeof(float));
+
+    for(int i = 0; i < X; i++){
+        b[i] = &b_mem[i*Y];
+    }
+
+    // ====== Inicializar en 0 ======
+    for (int i = 0; i < X*Y; i++){
+        pressure_mem[i] = 0.0f;
+        pressure_buffer_mem[i] = 0.0f;
+        density_mem[i] = 0.0f;
+        density_buffer_mem[i] = 0.0f;
+        b_mem[i] = 0.0f;
+    }
+    for (int i = 0; i < X*Y*2; i++){
+        velocity_mem[i] = 0.0f;
+        velocity_buffer_mem[i] = 0.0f;
+        forces_mem[i] = 0.0f;
     }
 }
 
 void free_arrays(int X, int Y){
-    // Free velocity
-    for(int i = 0; i < X; i++) {
-        for(int j = 0; j < Y; j++) {
-            free(forces[i][j]);
-            free(velocity[i][j]);
-            free(velocity_buffer[i][j]);
-        }
-        free(forces[i]);
+    // Liberar punteros secundarios
+    for(int i = 0; i < X; i++){
         free(velocity[i]);
         free(velocity_buffer[i]);
+        free(forces[i]);
     }
-    free(forces);
     free(velocity);
     free(velocity_buffer);
+    free(forces);
 
-    // Free other
-    for(int i = 0; i < X; i++){
-        free(pressure[i]);
-        free(pressure_buffer[i]);
-        free(density[i]);
-        free(density_buffer[i]);
-        free(b[i]);
-    }
     free(pressure);
     free(pressure_buffer);
     free(density);
     free(density_buffer);
     free(b);
+
+    // Liberar bloques de memoria contigua
+    free(pressure_mem);
+    free(pressure_buffer_mem);
+    free(density_mem);
+    free(density_buffer_mem);
+    free(b_mem);
+    free(velocity_mem);
+    free(velocity_buffer_mem);
+    free(forces_mem);
 }

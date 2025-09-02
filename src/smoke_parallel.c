@@ -11,17 +11,6 @@
 
 // ---------------- Helpers ----------------------- //
 
-// Heurística simple para fijar #threads según tamaño del problema.
-static inline int choose_threads(const Data *data) {
-    const long long cells = (long long)data->x * (long long)data->y;
-    int max_t = omp_get_max_threads();
-    // Escala con el tamaño, limita de 1..max_t
-    if (cells < 20000) return 1;
-    if (cells < 40000) return max_t > 2 ? 2 : 1;
-    if (cells < 200000) return 3;
-    return max_t;
-}
-
 // ---------------- Memory ----------------------- //
 
 void copy_vec(float ***target, float ***origin, Data *data){

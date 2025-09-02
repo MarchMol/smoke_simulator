@@ -20,14 +20,7 @@
 #define GRID_WIDTH 200
 #define GRID_HEIGHT 200
 
-static inline int choose_threads_for(const Data *data) {
-    long long cells = (long long)data->x * (long long)data->y;
-    int max_t = omp_get_max_threads();
-    if (cells < 20000)   return 1;
-    if (cells < 40000)   return max_t > 2 ? 2 : 1;
-    if (cells < 200000)  return max_t > 4 ? 4 : max_t;
-    return max_t;
-}
+
 
 // Performance monitoring
 typedef struct {
@@ -240,7 +233,7 @@ int render(
         _putenv_s("OMP_PROC_BIND","close");
         _putenv_s("OMP_PLACES","cores");
         #endif
-        omp_set_num_threads( choose_threads_for(data) ); // usa tu helper en smoke_parallel.c
+        omp_set_num_threads( choose_threads(data) ); 
     init_performance_monitor();
     int counter = 0;
     glfwMakeContextCurrent(window);
