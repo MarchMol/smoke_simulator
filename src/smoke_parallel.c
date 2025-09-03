@@ -113,7 +113,7 @@ void update_forces(
     float h = data->h;
     float dt = data->dt;
     // 1. Calculte Vorticity index 
-  #pragma omp for schedule (static, 8)
+    #pragma omp for schedule (static, 8)
         for(int i = 1; i<x-1; i++){
             for(int j = 1; j<y-1; j++){
                 //      w = (∂U / ∂x)  ​− (∂U / ∂y)​
@@ -142,21 +142,22 @@ void update_forces(
                 float wy = (
                     buffer_scalar[i][j+1] - buffer_scalar[i][j-1]
                 )/(2*h);
+                if(wx > 1e-6 && wy > 1e-6){
                 // Normalization
-                float mag_w = sqrtf(wx*wx + wy*wy);
-                if(mag_w <= 0) mag_w = 1e-12;
+                    float mag_w = sqrtf(wx*wx + wy*wy);
+                    if (mag_w < 1e-12) mag_w = 1e-12;
+                                        // force: F = eps * h (N x w)
+                    float fx = eps_h* wx/mag_w * buffer_scalar[i][j];
+                    float fy = -(eps_h * wy/mag_w * buffer_scalar[i][j]) +  alpha*density[i][j];
 
-                // force: F = eps * h (N x w)
-                float fx = eps_h* wx/mag_w * buffer_scalar[i][j];
-                float fy = -(eps_h * wy/mag_w * buffer_scalar[i][j]) +  alpha*density[i][j];
+                    forces[i][j][0] = fx;
+                    // fy = - eps * h (Nx X w)
+                    forces[i][j][1] = fy;
 
-                forces[i][j][0] = fx;
-                // fy = - eps * h (Nx X w)
-                forces[i][j][1] = fy;
-
-                // 3. Update Velocities
-                velocity[i][j][0]+=dt*fx;
-                velocity[i][j][1]+=dt*fy;
+                    // 3. Update Velocities
+                    velocity[i][j][0]+=dt*fx;
+                    velocity[i][j][1]+=dt*fy;
+                }
             }
         }
     }
@@ -177,74 +178,73 @@ void density_steps(
     // 1. Advection
 
     copy_scalar(density_buffer, density, data);
-        float **src = density_buffer; // lectura
-        float **dst = density; // escritura
-        #pragma omp for schedule(static, 8)
-        for(int i = 1; i<=x-1; i++){
-            for(int j = 1; j<=y-1; j++){
-                float x_prev = i - (dt * velocity[i][j][0])/h;
-                float y_prev = j - (dt * velocity[i][j][1])/h;
+    float **src = density_buffer; // lectura
+    float **dst = density; // escritura
+    #pragma omp for schedule(static, 8)
+    for(int i = 1; i<=x-1; i++){
+        for(int j = 1; j<=y-1; j++){
+            float x_prev = i - (dt * velocity[i][j][0])/h;
+            float y_prev = j - (dt * velocity[i][j][1])/h;
 
-                // Clamp
-                if (x_prev < 0.5f) x_prev = 0.5f;
-                if (x_prev > x - 1.5f) x_prev = x - 1.5f;
-                if (y_prev < 0.5f) y_prev = 0.5f;
-                if (y_prev > y - 1.5f) y_prev = y - 1.5f;
+            // Clamp
+            if (x_prev < 0.5f) x_prev = 0.5f;
+            if (x_prev > x - 1.5f) x_prev = x - 1.5f;
+            if (y_prev < 0.5f) y_prev = 0.5f;
+            if (y_prev > y - 1.5f) y_prev = y - 1.5f;
 
-                int i0 = (int)x_prev;
-                int j0 = (int)y_prev;
-                float sx = x_prev - i0;
-                float sy = y_prev - j0;
+            int i0 = (int)x_prev;
+            int j0 = (int)y_prev;
+            float sx = x_prev - i0;
+            float sy = y_prev - j0;
 
-                if(i0 < 0) i0 = 0;
-                if(j0 < 0) j0 = 0;
-                if(i0 > x-2) i0 = x-2;
-                if(j0 > y-2) j0 = y-2;
-                // Bilinear interpolation
-                float density_interp =
-                    (1-sx) * (1-sy) * density_buffer[i0  ][j0  ] + 
-                    sx     * (1-sy) * density_buffer[i0+1][j0  ] + 
-                    (1-sx) * sy     * density_buffer[i0  ][j0+1] + 
-                    sx     * sy     * density_buffer[i0+1][j0+1]
-                    ;
-                // Saving into complete array
-                density[i][j] = density_interp;
-            }  
+            if(i0 < 0) i0 = 0;
+            if(j0 < 0) j0 = 0;
+            if(i0 > x-2) i0 = x-2;
+            if(j0 > y-2) j0 = y-2;
+            // Bilinear interpolation
+            float density_interp =
+                (1-sx) * (1-sy) * density_buffer[i0  ][j0  ] + 
+                sx     * (1-sy) * density_buffer[i0+1][j0  ] + 
+                (1-sx) * sy     * density_buffer[i0  ][j0+1] + 
+                sx     * sy     * density_buffer[i0+1][j0+1]
+                ;
+            // Saving into complete array
+            density[i][j] = density_interp;
+        }  
+    }
+
+    // 3. Diffuse
+    #pragma omp single
+    {
+        copy_scalar(density_buffer, density, data);
+    }
+    #pragma omp barrier
+    float alpha = (scalar_diffusion*dt)/(h*h);
+    for (int jac = 0; jac < jacobi_iter; ++jac) {
+        #pragma omp for schedule(static,8)
+        for (int i = 1; i < x-1; i++) {
+            #pragma omp simd
+            for (int j = 1; j < y-1; j++) {
+                dst[i][j] = (src[i][j] + alpha * (
+                            src[i-1][j] + src[i+1][j] +
+                            src[i][j-1] + src[i][j+1])) / (1 + 4*alpha);
+            }
         }
-
-        // 3. Diffuse
         #pragma omp single
         {
-            copy_scalar(density_buffer, density, data);
+            for (int i=0; i<x; i++) { dst[i][0]=dst[i][1]; dst[i][y-1]=dst[i][y-2]; }
+            for (int j=0; j<y; j++) { dst[0][j]=dst[1][j]; dst[x-1][j]=dst[x-2][j]; }
+            float **tmp =src; src = dst; dst = tmp;
         }
         #pragma omp barrier
-
-        float alpha = (scalar_diffusion*dt)/(h*h);
-            for (int jac = 0; jac < jacobi_iter; ++jac) {
-                #pragma omp for schedule(static,16)
-                for (int i = 1; i < x-1; i++) {
-                    #pragma omp simd
-                    for (int j = 1; j < y-1; j++) {
-                        dst[i][j] = (src[i][j] + alpha * (
-                                    src[i-1][j] + src[i+1][j] +
-                                    src[i][j-1] + src[i][j+1])) / (1 + 4*alpha);
-                    }
-                }
-                #pragma omp single
-                {
-                    for (int i=0; i<x; i++) { dst[i][0]=dst[i][1]; dst[i][y-1]=dst[i][y-2]; }
-                    for (int j=0; j<y; j++) { dst[0][j]=dst[1][j]; dst[x-1][j]=dst[x-2][j]; }
-                    float **tmp =src; src = dst; dst = tmp;
-                }
-                #pragma omp barrier
-            }
-            #pragma omp single
-            {
-                if (src !=density)
-                    copy_scalar(density, src, data);
-            }
-            #pragma omp barrier
-        }
+    }
+    #pragma omp single
+    {
+        if (src !=density)
+            copy_scalar(density, src, data);
+    }
+    #pragma omp barrier
+}
 
         
 void velocity_steps(
@@ -493,7 +493,6 @@ void simulation_step(
     #endif
     #endif
     omp_set_num_threads( choose_threads(data) );
-    
     update_forces(
         velocity,
         forces,
@@ -501,6 +500,7 @@ void simulation_step(
         density_buffer,
         data
     );
+   
     density_steps(
         velocity,
         density,
@@ -512,6 +512,8 @@ void simulation_step(
         velocity_buffer,
         data
     );
+
+
     pressure_projection(
         pressure,
         pressure_buffer,

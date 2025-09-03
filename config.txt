@@ -2,9 +2,10 @@
 #                                     #
 #  -----------  Display    ---------- #
 
-display_width = 900
-display_height = 600
-grid_ratio = 0.3
+display_width = 1100
+display_height = 650
+grid_ratio = 1.0
+
 
 #  ------    Sim Parameters    ------ #
 
@@ -23,11 +24,11 @@ shape = circle
 amount_shapes = 10
 emission_area = 0.1
 emission_rate = 0.8
-emmision_velocity_factor = 0.75
+emmision_velocity_factor = 0.6
 
 
 #  ------    Visualization     ------ #
 #  2d or 3d
-mode = 2d
+mode = 3d
 # grayscale | gray_inverted | lerp
-shader = grayscale
+shader = lerp

@@ -6,7 +6,7 @@ INCLUDE = -Iinclude
 LIBPATH = -Llib
 
 # Libraries to link
-LIBS = -lglfw3 -lopengl32 -lgdi32
+LIBS = -lglfw3 -lopengl32 -lgdi32 -lglu32
 
 # Output executable
 OUT_SEQ = bin/main_seq.exe
@@ -22,9 +22,10 @@ MAIN_PAR   = src/main_parallel.c
 SMOKE_SEQ  = src/smoke.c
 SMOKE_OMP  = src/smoke_parallel.c
 STATE  = src/state.c
+GLAD = src/glad.c
 
 SRC_SEQ = $(MAIN_SEQ) $(STATE) $(SMOKE_SEQ)
-SRC_OMP = $(MAIN_PAR) $(STATE) $(SMOKE_OMP)
+SRC_OMP = $(GLAD) $(MAIN_PAR) $(STATE) $(SMOKE_OMP)
 
 # Utils
 BIN_DIR = bin

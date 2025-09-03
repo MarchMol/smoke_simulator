@@ -1,4 +1,7 @@
+#include <glad/glad.h>
 #include <GLFW/glfw3.h>
+
+
 #define _USE_MATH_DEFINES 
 #include <stdlib.h>
 #include <stdio.h>
@@ -12,6 +15,7 @@
 #include <omp.h>
 #include <xmmintrin.h>
 
+
 // Display
 #define DISPLAY_WIDTH 900
 #define DISPLAY_HEIGHT 600
@@ -19,7 +23,6 @@
 // Simulation
 #define GRID_WIDTH 200
 #define GRID_HEIGHT 200
-
 
 
 // Performance monitoring
@@ -133,7 +136,6 @@ float rand_float(float min, float max) {
     return min + ((float)rand() / RAND_MAX) * (max - min);
 }
 
-
 void write_to_window(
     float **density,
     unsigned char *framebuffer,
@@ -145,37 +147,39 @@ void write_to_window(
     int display_width = dis_par->dis_width;
     int display_height = dis_par->dis_height;
 
+    int total_pixels = display_width * display_height;
 
-    for(int i = 0; i < display_width; i++){
-        for(int j = 0; j < display_height; j++){
-            // Round index
-            int x_orig = (int)round( i * (grid_width-1)) / (display_width-1);
-            int y_orig = (int)round( j * (grid_width-1)) / (display_width-1);
+    #pragma omp parallel for
+    for(int p = 0; p<total_pixels;p++){
+        int i = p % display_width;
+        int j = p / display_width;
+        // Round index
+        int x_orig = (int)round( i * (grid_width-1)) / (display_width-1);
+        int y_orig = (int)round( j * (grid_width-1)) / (display_width-1);
 
-            // Get density
-            float density_val = density[x_orig][y_orig];
-            if(density_val > 1.0f) density_val = 1.0f;
-            if(density_val < 0.0f) density_val = 0.0f;
+        // Get density
+        float density_val = density[x_orig][y_orig];
+        if(density_val > 1.0f) density_val = 1.0f;
+        if(density_val < 0.0f) density_val = 0.0f;
 
-            // Shader
-            int fb_index = (j * display_width + i) * 3;
-            if(vis_data->shader == 0){ // Grayscale
-                framebuffer[fb_index + 0] = (unsigned char)(density_val* 255.0f);
-                framebuffer[fb_index + 1] = (unsigned char)(density_val* 255.0f);
-                framebuffer[fb_index + 2] = (unsigned char)(density_val* 255.0f);
-            } else if (vis_data->shader == 1){
-                framebuffer[fb_index + 0] = (unsigned char)((1.0f-density_val)* 255.0f);
-                framebuffer[fb_index + 1] = (unsigned char)((1.0f-density_val)* 255.0f);
-                framebuffer[fb_index + 2] = (unsigned char)((1.0f-density_val)* 255.0f);
-            } else {
-                Color c = colormap(density_val);
-                framebuffer[fb_index + 0] = (unsigned char)(c.r* 255.0f);
-                framebuffer[fb_index + 1] = (unsigned char)(c.g* 255.0f);
-                framebuffer[fb_index + 2] = (unsigned char)(c.b* 255.0f);
-            }
-            // Write to buffer
-            
-
+        // Shader
+        int fb_index = (j * display_width + i) * 3;
+        if(vis_data->shader == 0){
+            unsigned char val = (unsigned char)(density_val* 255.0f);
+            framebuffer[fb_index + 0] = val;
+            framebuffer[fb_index + 1] = val;
+            framebuffer[fb_index + 2] = val;
+        }
+        else if (vis_data->shader == 1){ // Inverted grayscale
+            unsigned char val = (unsigned char)((1.0-density_val)* 255.0f);
+            framebuffer[fb_index + 0] = val;
+            framebuffer[fb_index + 1] = val;
+            framebuffer[fb_index + 2] = val;
+        } else{ // Heatmap
+            Color c = colormap(density_val);
+            framebuffer[fb_index + 0] = (unsigned char)(c.r * 255.0f);
+            framebuffer[fb_index + 1] = (unsigned char)(c.g * 255.0f);
+            framebuffer[fb_index + 2] = (unsigned char)(c.b * 255.0f);
         }
     }
 }
@@ -223,56 +227,117 @@ int render(
     InitialCondition *init_cond,
     Data *data
 ){
-        // OpenMP: equipo estable y afinidad
-        omp_set_dynamic(0);
-        omp_set_max_active_levels(1);
-        #if defined(_OPENMP) && (_OPENMP>=200805)
-        omp_set_schedule(omp_sched_static, 0);
-        #endif
-        #ifdef _WIN32
-        _putenv_s("OMP_PROC_BIND","close");
-        _putenv_s("OMP_PLACES","cores");
-        #endif
-        omp_set_num_threads( choose_threads(data) ); 
+    // OpenMP: equipo estable y afinidad
+    omp_set_dynamic(0);
+    omp_set_max_active_levels(1);
+    #if defined(_OPENMP) && (_OPENMP>=200805)
+    omp_set_schedule(omp_sched_static, 0);
+    #endif
+    #ifdef _WIN32
+    _putenv_s("OMP_PROC_BIND","close");
+    _putenv_s("OMP_PLACES","cores");
+    #endif
+    omp_set_num_threads( choose_threads(data) ); 
     init_performance_monitor();
-    int counter = 0;
+
+    // Create GLFW context
     glfwMakeContextCurrent(window);
     glfwSwapInterval(0);
-        while (!glfwWindowShouldClose(window)) {
-            double t0 = glfwGetTime();
-            // Clear buffer
-                glClear(GL_COLOR_BUFFER_BIT);
-                // Add source of fluid
-                if (counter == 0){
-                    apply_condition(init_cond);
-                }
-            // Simulate next step
-            simulation_step(pressure, pressure_buffer, density, density_buffer, b, forces, velocity, velocity_buffer, data);
-            // Write to framebuffer
-            write_to_window(density, framebuffer, vis_data, dis_par);
-            
-            // Framebuffer to window
-            glDrawPixels(dis_par->dis_width, dis_par->dis_height, GL_RGB, GL_UNSIGNED_BYTE, framebuffer);
-            glfwSwapBuffers(window);
-            glfwPollEvents();
 
-            // fps
-                double t1 = glfwGetTime();
-                double dt = t1 - t0;
-                if (dt <= 0.0) dt = 1e-9;          // ← blinda delta
-                double current_fps = 1.0 / dt;
-                update_performance_metrics(current_fps);
-                counter++;
-            if (counter % 5 == 0) {
-                printf("Frame %d - FPS: %.1f (Avg: %.1f)\n",
-                    counter, current_fps, perf.avg_fps);
-            }
-            if (counter >= 200) {
-                printf("Completed 200 frames for performance testing.\n");
-                break;
-            }
+    glEnable(GL_TEXTURE_2D);
+
+    GLuint tex;
+    glGenTextures(1, &tex);
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, dis_par->dis_width, dis_par->dis_height, 0,
+                GL_RGB, GL_UNSIGNED_BYTE, NULL);
+
+    // Setup projection (ortographic)
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(0, dis_par->dis_width, 0, dis_par->dis_height, -1, 1);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+    GLuint pbo;
+    glGenBuffers(1, &pbo);
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
+    glBufferData(GL_PIXEL_UNPACK_BUFFER, dis_par->dis_width*dis_par->dis_height*3, NULL, GL_STREAM_DRAW);
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+    
+    
+    int counter = 0;
+    apply_condition(init_cond);
+    int grid_width = dis_par->grid_width;
+    int grid_height = dis_par->grid_height;
+    int display_width = dis_par->dis_width;
+    int display_height = dis_par->dis_height;
+
+    int total_pixels = display_width * display_height;
+
+    while (!glfwWindowShouldClose(window)) {
+        double t0 = glfwGetTime();
+        // Simulate next step
+        simulation_step(pressure, pressure_buffer, density, density_buffer, b, forces, velocity, velocity_buffer, data);
+        // Clear screen
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        // Mapear PBO al puntero de la cpu
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
+        unsigned char* ptr = (unsigned char*)glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
+        if(!ptr){
+            fprintf(stderr, "ERROR: PBO mapping failed!\n");
+            break; // or continue / handle
         }
+        // Write sim
+        write_to_window(density, ptr, vis_data, dis_par);
+
+
+        // Unmap pbo
+        glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
+
+        // PBO -> GPU
+        glBindTexture(GL_TEXTURE_2D, tex);
+        glTexSubImage2D(
+            GL_TEXTURE_2D, 0, 0, 0,
+            dis_par->dis_width, dis_par->dis_height,
+            GL_RGB, GL_UNSIGNED_BYTE, 0
+        );
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+
+        // Draw
+        glBegin(GL_QUADS);
+            glTexCoord2f(0, 0); glVertex2f(0, 0);
+            glTexCoord2f(1, 0); glVertex2f(dis_par->dis_width, 0);
+            glTexCoord2f(1, 1); glVertex2f(dis_par->dis_width, dis_par->dis_height);
+            glTexCoord2f(0, 1); glVertex2f(0, dis_par->dis_height);
+        glEnd();
+
+        // Swap buffers/poll events
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+
+        // fps
+        double t1 = glfwGetTime();
+        double dt = t1 - t0;
+        if (dt <= 0.0) dt = 1e-9;          // ← blinda delta
+        double current_fps = 1.0 / dt;
+        update_performance_metrics(current_fps);
+        counter++;
+        if (counter % 5 == 0) {
+            printf("Frame %d - FPS: %.1f (Avg: %.1f)\n",
+                counter, current_fps, perf.avg_fps);
+        }
+        if (counter >= 200) {
+            printf("Completed 200 frames for performance testing.\n");
+            break;
+        }
+    }
     print_performance_summary();
+    glDeleteTextures(1, &tex);
+    glfwDestroyWindow(window);
     glfwTerminate();
     return 0;
 }
@@ -403,14 +468,12 @@ int main() {
     DisplayParams dis_par;
     InitialCondition init_cond;
     VisData vis_data;
-
-    // Fetch config data
     parse_config(&data, &dis_par, &init_cond, &vis_data);
 
     // Display Init
     if (!glfwInit())
         return -1;
-
+    
     GLFWwindow* window = glfwCreateWindow(
         dis_par.dis_width, dis_par.dis_height, "Fluid SImulation", NULL, NULL
     );
@@ -418,6 +481,13 @@ int main() {
         glfwTerminate();
         return -1;
     }
+
+    glfwMakeContextCurrent(window);
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+        fprintf(stderr, "Failed to initialize GLAD\n");
+        return -1;
+    }   
+
     unsigned char *framebuffer = malloc(dis_par.dis_width * dis_par.dis_height * 3);
 
     // Simulation Init
