@@ -28,6 +28,6 @@ emmision_velocity_factor = 0.75
 
 #  ------    Visualization     ------ #
 #  2d or 3d
-mode = 2d
+mode = 3d
 # grayscale | gray_inverted | lerp
-shader = grayscale
+shader = lerp
