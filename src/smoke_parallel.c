@@ -113,7 +113,7 @@ void update_forces(
     float h = data->h;
     float dt = data->dt;
     // 1. Calculte Vorticity index 
-  #pragma omp for schedule (static, 8)
+        #pragma omp for schedule (static, 8) //reparte celdas; cada hilo calcula la vorticidad local con diferencias centrales y guarda |ω| en un buffer escalar
         for(int i = 1; i<x-1; i++){
             for(int j = 1; j<y-1; j++){
                 //      w = (∂U / ∂x)  ​− (∂U / ∂y)​
@@ -132,7 +132,7 @@ void update_forces(
         // 2. Calculate ∇|w| and resulting force
         float alpha = data->buoyancy_coeff;
         float eps_h = data->conf_strenght * h;
-        #pragma omp for schedule(static, 8) 
+        #pragma omp for schedule(static, 8) //Cada hilo toca celdas distintaw
         for(int i = 1; i<x-1; i++){
             #pragma omp simd
             for(int j = 1; j<y-1; j++){
@@ -179,7 +179,7 @@ void density_steps(
     copy_scalar(density_buffer, density, data);
         float **src = density_buffer; // lectura
         float **dst = density; // escritura
-        #pragma omp for schedule(static, 8)
+        #pragma omp for schedule(static, 8) //Cada hilo hace un back-tracking de su celda i,j
         for(int i = 1; i<=x-1; i++){
             for(int j = 1; j<=y-1; j++){
                 float x_prev = i - (dt * velocity[i][j][0])/h;
@@ -213,37 +213,37 @@ void density_steps(
         }
 
         // 3. Diffuse
-        #pragma omp single
+        #pragma omp single // unica copia de seguridad
         {
             copy_scalar(density_buffer, density, data);
         }
-        #pragma omp barrier
-
+        #pragma omp barrier //alinea todos 
+        //Difusion Jacobi
         float alpha = (scalar_diffusion*dt)/(h*h);
             for (int jac = 0; jac < jacobi_iter; ++jac) {
-                #pragma omp for schedule(static,16)
+                #pragma omp for schedule(static,16) //reparte las filas
                 for (int i = 1; i < x-1; i++) {
-                    #pragma omp simd
+                    #pragma omp simd //vectoriza el bucle interno los hilos leen src y escriben en dst
                     for (int j = 1; j < y-1; j++) {
                         dst[i][j] = (src[i][j] + alpha * (
                                     src[i-1][j] + src[i+1][j] +
                                     src[i][j-1] + src[i][j+1])) / (1 + 4*alpha);
                     }
                 }
-                #pragma omp single
+                #pragma omp single // aplica bordes y hace el swap de punteros src <-> dst(solo un hilo lo hace)
                 {
                     for (int i=0; i<x; i++) { dst[i][0]=dst[i][1]; dst[i][y-1]=dst[i][y-2]; }
                     for (int j=0; j<y; j++) { dst[0][j]=dst[1][j]; dst[x-1][j]=dst[x-2][j]; }
                     float **tmp =src; src = dst; dst = tmp;
                 }
-                #pragma omp barrier
+                #pragma omp barrier // Sincroniza para que todos vean el mismo src en la siguiente iteración
             }
-            #pragma omp single
+            #pragma omp single // Copia final a density
             {
-                if (src !=density)
+                if (src !=density) // si la solución quedó en el buffer
                     copy_scalar(density, src, data);
             }
-            #pragma omp barrier
+            #pragma omp barrier //Sincroniza
         }
 
         
@@ -271,7 +271,7 @@ void velocity_steps(
     //      velocity is now U^a
         float ***src = velocity_buffer; // lectura
         float ***dst = velocity;        // escritura
-            #pragma omp for schedule(static, 8)
+            #pragma omp for schedule(static, 8) // Cada hilo procesa celdas distintas y escribe en velocity
             for(int i = 0; i<x; i++){
                 #pragma omp simd
                 for(int j = 0; j<y; j++){
@@ -318,16 +318,16 @@ void velocity_steps(
         // printf("completed U^a\n");
         // 3. Diffuse | Jacobi iterate
         //      buffer is now prev, and velocity is U^*
-        #pragma omp single
+        #pragma omp single // copia una vez en velocity → velocity_buffer
         {
             copy_vec(velocity_buffer, velocity, data);
         }
-        #pragma omp barrier
+        #pragma omp barrier // Barrier para alinear
 
         float alpha = (viscosity*dt)/(h*h);
-
+        // difusión viscosa Jacobi
         for (int jac = 0; jac < jacobi_iter; ++jac) {
-            #pragma omp for schedule(static,16)
+            #pragma omp for schedule(static,16) // Leyendo src y escribiendo dst
             for (int i = 1; i < x-1; i++) {
                 #pragma omp simd
                 for (int j = 1; j < y-1; j++) {
@@ -342,7 +342,7 @@ void velocity_steps(
                 }
             }
             // Setting boundary conditions to 0
-            #pragma omp single
+            #pragma omp single // hacer swap src<->dst
                 {
                     // bordes en 'dst'
                     for (int i = 1; i < x-1; i++) {
@@ -355,7 +355,7 @@ void velocity_steps(
                     }
                     float ***tmp = src; src = dst; dst = tmp;   // SWAP
                 }
-                #pragma omp barrier
+                #pragma omp barrier // alinear
 
             // al salir: 'src' contiene la solución final
             #pragma omp single
@@ -383,7 +383,7 @@ void pressure_projection(
     float h = data->h;
     int jacobi_iter = data->jacobi_iter;
     // Calculate b (solution)
-    #pragma omp parallel for schedule(static,8) 
+    #pragma omp parallel for schedule(static,8)  // computa b[i][j] con diferencias centrales de velocity por celda
     for(int i = 1; i<x-1;i++){
         for(int j = 1; j<y-1; j++){
             // b = (ρ/Δt) * ∇u
@@ -399,9 +399,9 @@ void pressure_projection(
     copy_scalar(pressure_buffer, pressure, data);
         float **src = pressure_buffer; // lectura
         float **dst = pressure;        // escritura
-
+    // Jacobi para p
     for (int jac = 0; jac < jacobi_iter; ++jac) {
-        #pragma omp for schedule(static,8)
+        #pragma omp for schedule(static,8) // actualizar dst desde src
         for (int i = 1; i < x-1; i++) {
             #pragma omp simd
             for (int j = 1; j < y-1; j++) {
@@ -411,23 +411,22 @@ void pressure_projection(
                 ) * 0.25f;
                 }
             }
-            #pragma omp single
+            #pragma omp single // aplica los bordes y hace swap
             {
                 for (int i = 0; i < x; i++) { dst[i][0] = 0; dst[i][y-1] = 0; }
                 for (int j = 0; j < y; j++) { dst[0][j] = 0; dst[x-1][j] = 0; }
                 float **tmp = src; src = dst; dst = tmp;  // SWAP
             }
-            #pragma omp barrier
+            #pragma omp barrier // alinear
         }
-    #pragma omp single
+    #pragma omp single // copia final a pressure
     {
         if (src != pressure)
             copy_scalar(pressure, src, data);  // una sola copia final si hizo falta
     }
-    #pragma omp barrier
+    #pragma omp barrier // alinear
 }
     
-
 
 void correct_velocity(
     float ***velocity,
@@ -440,7 +439,7 @@ void correct_velocity(
     float dt = data->dt;
     float h = data->h;
     // Solo paralelizar si es beneficioso
-    #pragma omp parallel for schedule(static, 8)
+    #pragma omp parallel for schedule(static, 8) // cada hilo actualiza su subconjunto de celdas
     for(int i = 1; i<x-1; i++){
         for(int j = 1; j<y-1; j++){
             velocity[i][j][0] -= 
@@ -476,13 +475,15 @@ void simulation_step(
 
 ){
     // Usar solo 2-4 threads para evitar overhead
+    // Evitan cambios de hilos y anidamiento no deseado
     omp_set_dynamic(0);            // evita cambiar #hilos en caliente
     omp_set_max_active_levels(1);  // evita anidamiento accidental
     #if defined(_OPENMP) && (_OPENMP>= 200805)
-        omp_set_schedule(omp_sched_static, 0); 
+        omp_set_schedule(omp_sched_static, 0); //preferencia por reparto estático (carga uniforme).
     #endif
     #ifdef _WIN32
     // Afinidad “en código” (libgomp respeta esto)
+    // preferencia por reparto estático (carga uniforme)
     _putenv_s("OMP_PROC_BIND", "close");   // hilos cerca del principal
     _putenv_s("OMP_PLACES",    "cores");   // fija lugares a núcleos
 #endif
@@ -492,6 +493,7 @@ void simulation_step(
     _MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_ON);
     #endif
     #endif
+    //elige #hilos según la máquina/problema.
     omp_set_num_threads( choose_threads(data) );
     
     update_forces(
