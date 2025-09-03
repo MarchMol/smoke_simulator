@@ -42,6 +42,7 @@ FILE *stream;
 typedef struct {
     int mode;
     int shader;
+    int stop_after;
 } VisData;
 
 typedef struct {
@@ -330,9 +331,11 @@ int render(
             printf("Frame %d - FPS: %.1f (Avg: %.1f)\n",
                 counter, current_fps, perf.avg_fps);
         }
-        if (counter >= 200) {
-            printf("Completed 200 frames for performance testing.\n");
-            break;
+        if (vis_data->stop_after > 0){
+            if (counter >= vis_data->stop_after) {
+                printf("Completed 200 frames for performance testing.\n");
+                break;
+            }
         }
     }
     print_performance_summary();
@@ -435,6 +438,10 @@ void parse_config(
                 fprintf(stderr, "[ERROR] shader valor no permitido (%s)\n", shader);
                 exit(EXIT_FAILURE);
             }
+            continue;
+        }
+        if (sscanf(line, "stop_after = %d", &vis_data->stop_after) == 1) {
+            if (vis_data->stop_after < -1) { fprintf(stderr, "[ERROR] stop_after fuera de rango permitido (>=1)\n"); exit(EXIT_FAILURE); }
             continue;
         }
 

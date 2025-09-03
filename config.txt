@@ -4,14 +4,14 @@
 
 display_width = 1100
 display_height = 650
-grid_ratio = 1.0
+grid_ratio = 0.3
 
 
 #  ------    Sim Parameters    ------ #
 
 h = 10
 dt = 0.05
-jacobi_iter = 50
+jacobi_iter = 100
 viscosity = 0.01
 scalar_diffusion = 0.1
 buoyancy_coeff = 1.0
@@ -32,3 +32,5 @@ emmision_velocity_factor = 0.6
 mode = 3d
 # grayscale | gray_inverted | lerp
 shader = lerp
+#  stop after n frames | -1 to not stop
+stop_after = -1
