@@ -285,29 +285,30 @@ void parse_config(
 
     while (fgets(line, sizeof(line), f)) {
         // Sim data
-        if (sscanf(line, "h = %f", &data->h) == 1) continue;
-        if (sscanf(line, "dt = %f", &data->dt) == 1) continue;
-        if (sscanf(line, "jacobi_iter = %d", &data->jacobi_iter) == 1) continue;
-        if (sscanf(line, "viscosity = %f", &data->viscosity) == 1) continue;
-        if (sscanf(line, "scalar_diffusion = %f", &data->scalar_diffusion) == 1) continue;
-        if (sscanf(line, "buoyancy_coeff = %f", &data->buoyancy_coeff) == 1) continue;
-        if (sscanf(line, "conf_strenght = %f", &data->conf_strenght) == 1) continue;
-        
+
+        if (sscanf(line, "h = %f", &data->h) == 1) continue; // FLOAT: solo tiene que ser mayor que 0
+        if (sscanf(line, "dt = %f", &data->dt) == 1) continue; // FLOAT: solo tiene que ser mayor que 0
+        if (sscanf(line, "viscosity = %f", &data->viscosity) == 1) continue; // FLOAT: cualquiera
+        if (sscanf(line, "scalar_diffusion = %f", &data->scalar_diffusion) == 1) continue; // FLOAT: cualquiera
+        if (sscanf(line, "buoyancy_coeff = %f", &data->buoyancy_coeff) == 1) continue; // FLOAT: cualquiera
+        if (sscanf(line, "conf_strenght = %f", &data->conf_strenght) == 1) continue; // FLOAT: cualquiera
+        if (sscanf(line, "jacobi_iter = %d", &data->jacobi_iter) == 1) continue; // ENTERO: de 1 en adelante
+
         // Display data
-        if (sscanf(line, "display_width = %d", &dis_par->dis_width) == 1) continue;
-        if (sscanf(line, "display_height = %d", &dis_par->dis_height) == 1) continue;
-        if (sscanf(line, "grid_ratio = %f", &ratio) == 1) continue;
+        if (sscanf(line, "display_width = %d", &dis_par->dis_width) == 1) continue; // ENTERO: mayor a 20
+        if (sscanf(line, "display_height = %d", &dis_par->dis_height) == 1) continue; // ENTERO: mayor a 20
+        if (sscanf(line, "grid_ratio = %f", &ratio) == 1) continue; // FLOAT: mayor que 0, menor o igual que 1
 
         // // Initial condition
-        if (sscanf(line, "shape = %63s", &shape) == 1) continue;
-        if (sscanf(line, "amount_shapes = %d", &init_cond->amount_shapes) == 1) continue;
-        if (sscanf(line, "emission_area = %f", &area_factor) == 1) continue;
-        if (sscanf(line, "emission_rate = %f", &init_cond->emission_rate) == 1) continue;
-        if (sscanf(line, "emmision_velocity_factor = %f", &vel_factor) == 1) continue;
+        if (sscanf(line, "shape = %63s", &shape) == 1) continue; // STRING: ['circle', 'square', 'random']
+        if (sscanf(line, "amount_shapes = %d", &init_cond->amount_shapes) == 1) continue; // ENTERO: mayor que 0
+        if (sscanf(line, "emission_area = %f", &area_factor) == 1) continue;  // FLOAT: mayor que 0, menor que 1.
+        if (sscanf(line, "emission_rate = %f", &init_cond->emission_rate) == 1) continue; // FLOAT: 0 o mas
+        if (sscanf(line, "emmision_velocity_factor = %f", &vel_factor) == 1) continue; // FLOAT: 0 o mas
 
         // Visualization
-        if (sscanf(line, "mode = %63s", &mode) == 1) continue;
-        if (sscanf(line, "shader = %63s", &shader) == 1) continue;
+        if (sscanf(line, "mode = %63s", &mode) == 1) continue; // ESTE ES el 3d 2d, asi que te lo podes volar
+        if (sscanf(line, "shader = %63s", &shader) == 1) continue; // STRING: ['grayscale', 'gray_inverted', 'lerp']
     }
     int x =  (int)roundf(dis_par->dis_width * ratio);
     int y =  (int)roundf(dis_par->dis_height * ratio);
