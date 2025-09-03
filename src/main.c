@@ -271,119 +271,131 @@ void parse_config(
     InitialCondition *init_cond,
     VisData *vis_data
 ){
-    // Open config file
     FILE *f = fopen("config.txt", "r");
+    if (!f) {
+        fprintf(stderr, "[ERROR] No se pudo abrir config.txt\n");
+        exit(EXIT_FAILURE);
+    }
 
-    // Temporal buffers
     char line[512];
+    char shape[64]  = "";
+    char mode[64]   = "";
+    char shader[64] = "";
     float ratio = 1.0f;
-    char shape[64];
-    char mode[64];
-    char shader[64];
-    float area_factor;
-    float vel_factor;
+    float area_factor = 0.1f;
+    float vel_factor  = 0.5f;
 
     while (fgets(line, sizeof(line), f)) {
-        // Sim data
+        if (line[0] == '#' || strlen(line) < 3) continue;
 
-        if (sscanf(line, "h = %f", &data->h) == 1) continue; // FLOAT: solo tiene que ser mayor que 0
-        if (sscanf(line, "dt = %f", &data->dt) == 1) continue; // FLOAT: solo tiene que ser mayor que 0
-        if (sscanf(line, "viscosity = %f", &data->viscosity) == 1) continue; // FLOAT: cualquiera
-        if (sscanf(line, "scalar_diffusion = %f", &data->scalar_diffusion) == 1) continue; // FLOAT: cualquiera
-        if (sscanf(line, "buoyancy_coeff = %f", &data->buoyancy_coeff) == 1) continue; // FLOAT: cualquiera
-        if (sscanf(line, "conf_strenght = %f", &data->conf_strenght) == 1) continue; // FLOAT: cualquiera
-        if (sscanf(line, "jacobi_iter = %d", &data->jacobi_iter) == 1) continue; // ENTERO: de 1 en adelante
+        // --- Sim Parameters ---
+        if (sscanf(line, "h = %f", &data->h) == 1) {
+            if (data->h <= 0) { fprintf(stderr, "[ERROR] h fuera de rango permitido (>0)\n"); exit(EXIT_FAILURE); }
+            continue;
+        }
+        if (sscanf(line, "dt = %f", &data->dt) == 1) {
+            if (data->dt <= 0) { fprintf(stderr, "[ERROR] dt fuera de rango permitido (>0)\n"); exit(EXIT_FAILURE); }
+            continue;
+        }
+        if (sscanf(line, "jacobi_iter = %d", &data->jacobi_iter) == 1) {
+            if (data->jacobi_iter < 1) { fprintf(stderr, "[ERROR] jacobi_iter fuera de rango permitido (>=1)\n"); exit(EXIT_FAILURE); }
+            continue;
+        }
+        if (sscanf(line, "viscosity = %f", &data->viscosity) == 1) continue;
+        if (sscanf(line, "scalar_diffusion = %f", &data->scalar_diffusion) == 1) continue;
+        if (sscanf(line, "buoyancy_coeff = %f", &data->buoyancy_coeff) == 1) continue;
+        if (sscanf(line, "conf_strenght = %f", &data->conf_strenght) == 1) continue;
 
-        // Display data
-        if (sscanf(line, "display_width = %d", &dis_par->dis_width) == 1) continue; // ENTERO: mayor a 20
-        if (sscanf(line, "display_height = %d", &dis_par->dis_height) == 1) continue; // ENTERO: mayor a 20
-        if (sscanf(line, "grid_ratio = %f", &ratio) == 1) continue; // FLOAT: mayor que 0, menor o igual que 1
+        // --- Display ---
+        if (sscanf(line, "display_width = %d", &dis_par->dis_width) == 1) {
+            if (dis_par->dis_width <= 20) { fprintf(stderr, "[ERROR] display_width fuera de rango permitido (>20)\n"); exit(EXIT_FAILURE); }
+            continue;
+        }
+        if (sscanf(line, "display_height = %d", &dis_par->dis_height) == 1) {
+            if (dis_par->dis_height <= 20) { fprintf(stderr, "[ERROR] display_height fuera de rango permitido (>20)\n"); exit(EXIT_FAILURE); }
+            continue;
+        }
+        if (sscanf(line, "grid_ratio = %f", &ratio) == 1) {
+            if (ratio <= 0.0f || ratio > 1.0f) { fprintf(stderr, "[ERROR] grid_ratio fuera de rango permitido (0 < r <= 1)\n"); exit(EXIT_FAILURE); }
+            continue;
+        }
 
-        // // Initial condition
-        if (sscanf(line, "shape = %63s", &shape) == 1) continue; // STRING: ['circle', 'square', 'random']
-        if (sscanf(line, "amount_shapes = %d", &init_cond->amount_shapes) == 1) continue; // ENTERO: mayor que 0
-        if (sscanf(line, "emission_area = %f", &area_factor) == 1) continue;  // FLOAT: mayor que 0, menor que 1.
-        if (sscanf(line, "emission_rate = %f", &init_cond->emission_rate) == 1) continue; // FLOAT: 0 o mas
-        if (sscanf(line, "emmision_velocity_factor = %f", &vel_factor) == 1) continue; // FLOAT: 0 o mas
+        // --- Initial condition ---
+        if (sscanf(line, "shape = %63s", shape) == 1) {
+            if (strcmp(shape, "circle") != 0 && strcmp(shape, "square") != 0 && strcmp(shape, "random") != 0) {
+                fprintf(stderr, "[ERROR] shape valor no permitido (%s)\n", shape);
+                exit(EXIT_FAILURE);
+            }
+            continue;
+        }
+        if (sscanf(line, "amount_shapes = %d", &init_cond->amount_shapes) == 1) {
+            if (init_cond->amount_shapes <= 0) { fprintf(stderr, "[ERROR] amount_shapes fuera de rango permitido (>0)\n"); exit(EXIT_FAILURE); }
+            continue;
+        }
+        if (sscanf(line, "emission_area = %f", &area_factor) == 1) {
+            if (area_factor <= 0.0f || area_factor >= 1.0f) { fprintf(stderr, "[ERROR] emission_area fuera de rango permitido (0 < val < 1)\n"); exit(EXIT_FAILURE); }
+            continue;
+        }
+        if (sscanf(line, "emission_rate = %f", &init_cond->emission_rate) == 1) {
+            if (init_cond->emission_rate < 0.0f) { fprintf(stderr, "[ERROR] emission_rate fuera de rango permitido (>=0)\n"); exit(EXIT_FAILURE); }
+            continue;
+        }
+        if (sscanf(line, "emmision_velocity_factor = %f", &vel_factor) == 1) {
+            if (vel_factor < 0.0f) { fprintf(stderr, "[ERROR] emmision_velocity_factor fuera de rango permitido (>=0)\n"); exit(EXIT_FAILURE); }
+            continue;
+        }
 
-        // Visualization
-        if (sscanf(line, "mode = %63s", &mode) == 1) continue; // ESTE ES el 3d 2d, asi que te lo podes volar
-        if (sscanf(line, "shader = %63s", &shader) == 1) continue; // STRING: ['grayscale', 'gray_inverted', 'lerp']
+        // --- Visualization ---
+        if (sscanf(line, "mode = %63s", mode) == 1) {
+            if (strcmp(mode, "2d") != 0 && strcmp(mode, "3d") != 0) {
+                fprintf(stderr, "[ERROR] mode valor no permitido (%s)\n", mode);
+                exit(EXIT_FAILURE);
+            }
+            continue;
+        }
+        if (sscanf(line, "shader = %63s", shader) == 1) {
+            if (strcmp(shader, "grayscale") != 0 && strcmp(shader, "gray_inverted") != 0 && strcmp(shader, "lerp") != 0) {
+                fprintf(stderr, "[ERROR] shader valor no permitido (%s)\n", shader);
+                exit(EXIT_FAILURE);
+            }
+            continue;
+        }
+
+        // Ninguna coincidencia
+        fprintf(stderr, "[ERROR] Linea no reconocida: %s", line);
+        exit(EXIT_FAILURE);
     }
-    int x =  (int)roundf(dis_par->dis_width * ratio);
-    int y =  (int)roundf(dis_par->dis_height * ratio);
-    dis_par->grid_width = x;
-    dis_par->grid_height= y;
-    data->x = x;
-    data->y = y;
-
-    // Mode
-    if (strcmp(mode, "2d") == 0) {
-        vis_data->mode = 0;
-    } else if (strcmp(mode, "3d") == 0) {
-        vis_data->mode = 1;
-    }
-    // Shader
-    if (strcmp(shader, "grayscale") == 0) {
-        vis_data->shader = 0;
-    } else if (strcmp(shader, "gray_inverted") == 0) {
-        vis_data->shader= 1;
-    } else if (strcmp(shader, "lerp") == 0) {
-        vis_data->shader= 2;
-    }
-
-    // Init cond
-    if (strcmp(shape, "square") == 0) {
-        init_cond->shape = 0;
-    } else if (strcmp(shape, "circle") == 0) {
-        init_cond->shape = 1;
-    } else if (strcmp(shape, "rand") == 0) {
-        init_cond->shape = 2;
-    }
-    init_cond->emission_area = (int)roundf(max(x, y)*area_factor);
-    init_cond->min_x = init_cond->emission_area;
-    init_cond->max_x = x - init_cond->emission_area;
-    init_cond->min_y = init_cond->emission_area;
-    init_cond->max_y = y - init_cond->emission_area;
-    init_cond->emmision_velocity_factor = vel_factor * max(x, y);
-
-
-    // // Data check
-    printf("# Data #\n");
-    printf("\t X: %f \n",data->x);
-    printf("\t Y: %f \n",data->y);
-    printf("\t h: %f \n",data->h);
-    printf("\t dt: %f \n",data->dt);
-    printf("\t jacobi_iter: %d \n",data->jacobi_iter);
-    printf("\t viscosity: %f \n",data->viscosity);
-    printf("\t scalar_diffusion: %f \n",data->scalar_diffusion);
-    printf("\t buoyancy_coeff: %f \n",data->buoyancy_coeff);
-    printf("\t conf_strenght: %f \n\n",data->conf_strenght);
-
-    // // Display
-    printf("# Display #\n");
-    printf("\t Display Width: %d \n",dis_par->dis_width);
-    printf("\t Display Height: %d \n",dis_par->dis_height);
-    printf("\t Grid Width: %d \n",dis_par->grid_width);
-    printf("\t Grid Height: %d \n",dis_par->grid_height);
-    
-    // // Initial Condition
-    printf("# Initial Condition #\n");
-    printf("\t Shape: %d \n",init_cond->shape);
-    printf("\t amount shapes: %d \n",init_cond->amount_shapes);
-    printf("\t emission area: %d \n",init_cond->emission_area);
-    printf("\t emission rate: %f \n",init_cond->emission_rate);
-    printf("\t velocity factor: %f \n",init_cond->emmision_velocity_factor);
-    printf("\t X Bounds: (%d, %d) \n",init_cond->min_x, init_cond->max_x);
-    printf("\t Y Bounds: (%d, %d) \n",init_cond->min_y, init_cond->max_y);
-    
-
-    // printf("# Visualization #\n");
-    printf("\t mode: %d \n",vis_data->mode);
-    printf("\t shader: %d \n",vis_data->shader);
-    
     fclose(f);
+
+    // Calcular grid
+    dis_par->grid_width  = (int)roundf(dis_par->dis_width * ratio);
+    dis_par->grid_height = (int)roundf(dis_par->dis_height * ratio);
+    data->x = dis_par->grid_width;
+    data->y = dis_par->grid_height;
+
+    // Mapear strings validos
+    if (strcmp(shape, "circle") == 0) init_cond->shape = 1;
+    else if (strcmp(shape, "square") == 0) init_cond->shape = 0;
+    else if (strcmp(shape, "random") == 0) init_cond->shape = 2;
+
+    if (strcmp(shader, "grayscale") == 0) vis_data->shader = 0;
+    else if (strcmp(shader, "gray_inverted") == 0) vis_data->shader = 1;
+    else if (strcmp(shader, "lerp") == 0) vis_data->shader = 2;
+
+    if (strcmp(mode, "2d") == 0) vis_data->mode = 0;
+    else if (strcmp(mode, "3d") == 0) vis_data->mode = 1;
+
+    // Calcular emission_area y limites
+    init_cond->emission_area = (int)roundf(fmax(dis_par->grid_width, dis_par->grid_height) * area_factor);
+    init_cond->min_x = init_cond->emission_area;
+    init_cond->max_x = dis_par->grid_width - init_cond->emission_area;
+    init_cond->min_y = init_cond->emission_area;
+    init_cond->max_y = dis_par->grid_height - init_cond->emission_area;
+    init_cond->emmision_velocity_factor = vel_factor * fmax(dis_par->grid_width, dis_par->grid_height);
 }
+
+
+
 
 int main() {
     // Init data
