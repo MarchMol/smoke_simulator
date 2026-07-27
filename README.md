@@ -1,71 +1,79 @@
 # Screensaver - Smoke Simulator
-## Tecnologias utilizadas
-- GLFW (graficas)
-- OpenMP (paralelizacion)
+
+![Demo](demo.gif)
+
+## Technologies used
+- GLFW (graphics)
+- OpenMP (parallelization)
 - C / gcc (baseline)
-- Make (automatizar)
+- Make (automation)
 
 ## Setting up
 ### GLFW
-Para comenzar, primero descarguen la libreria que vamos a usar para abrir pantallas desde windows.
-1. Vayan a este link y decarguen el binario pre-compilado de windows de 64-bits.
+To get started, first download the library we'll use to open windows on Windows.
+1. Go to this link and download the pre-compiled 64-bit Windows binary.
 ```
 https://www.glfw.org/download.html
 ```
-2. Esto les tuvo que haber descargado una carpeta zip. Entonces ponganle extraer en la direccion ```C:dev/```
-3. Listo! ya los headers y arcivos "a" estan en este repositorio y ya les deberia de abrir una pestaña cuando lo corran.
+2. This should have downloaded a zip folder. Extract it to the path ```C:dev/```
+3. Done! The headers and "a" files are already in this repository, and a window should open when you run it.
 ### Make
-Para facilitar la compilacion y corrida de todo, va a ser mas facil si lo automatizamos todo con un makefile. Entonces, por si no lo tienen descargado sigan estos pasos:
-1. Descargar el msys
+To make compiling and running everything easier, it'll be simpler if we automate it all with a makefile. So, in case you don't have it downloaded, follow these steps:
+1. Download msys
 ```
 https://www.msys2.org/
 ```
-darle ok a todas las cosas y que se descarguen
-2. Corran el programa MYSYS2 MinGW que les va a abrir una terminal. En esta terminal pongan:
+Click ok on everything and let it download
+2. Run the MSYS2 MinGW program, which will open a terminal. In this terminal type:
 ```
 pacman -Sy
 pacman -S mingw-w64-x86_64-make
 ```
-Para verificar:
+To verify:
 ```
 mingw32-make --version
 ```
-3. En variables de sistema, dentro de path, pongan la direccion
+3. In your system's environment variables, under path, add
 ```
 C:\msys64\mingw64\bin
 ```
-4. Puede que necesiten reiniciar su compu antes, pero como ultimo paso ponganle un alias al ejecutable de make para hacerlo mas facil:
+4. You may need to restart your computer first, but as a last step, set up an alias for the make executable to make things easier:
 ```
 Set-Alias make "C:\msys64\mingw64\bin\mingw32-make.exe" 
 ```
-5. Ya estuvo!!
+5. That's it!!
 
 ## Running
-### Usando Make
-**Correr Secuencial**
+### Using Make
+**Run Sequential**
 ```
 make seq
 ```
-y para correr
+and to run it
 ```
 make run-seq
 ```
-**Correr Paralelo**
+**Run Parallel**
 ```
 make omp
 ```
-y para correr
+and to run it
 ```
 make run-omp
 ```
 
-### Manual Secuencial
-Si les pelo make, pueden hacerlo manual obvio, solo que necesitan correr lo siguiente.
+### Manual Sequential
+If make gives you trouble, you can obviously do it manually, you just need to run the following.
 ```
 gcc main.c -Iinclude -Llib -lglfw3 -lopengl32 -lgdi32 -o bin/main.exe
 ```
 
-correr:
+run:
 ```
 bin/main.exe
 ```
+
+## Credits
+- [MarchMol](https://github.com/MarchMol) — math and visualization
+- [JPS4321](https://github.com/JPS4321) — sequential and parallel approaches
+- [Sofiamishel2003](https://github.com/Sofiamishel2003) — optimization

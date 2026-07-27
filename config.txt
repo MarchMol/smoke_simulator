@@ -31,6 +31,6 @@ emmision_velocity_factor =0.8
 #  2d or 3d
 mode = 3d
 # grayscale | gray_inverted | lerp
-shader = lerp
+shader = gray_inverted
 #  stop after n frames | -1 to not stop
 stop_after = -1
