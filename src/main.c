@@ -4,7 +4,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#ifdef _WIN32
 #include <windows.h>
+#endif
 #include <time.h>
 #include "state.h"
 #include "data.h"

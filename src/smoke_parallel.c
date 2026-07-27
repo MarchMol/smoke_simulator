@@ -1,7 +1,9 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#ifdef _WIN32
 #include <windows.h>
+#endif
 #include <math.h>
 #include <omp.h>
 #include "smoke.h"
@@ -487,7 +489,10 @@ void simulation_step(
     // preferencia por reparto estático (carga uniforme)
     _putenv_s("OMP_PROC_BIND", "close");   // hilos cerca del principal
     _putenv_s("OMP_PLACES",    "cores");   // fija lugares a núcleos
-#endif
+    #else
+    setenv("OMP_PROC_BIND", "close", 1);
+    setenv("OMP_PLACES",    "cores", 1);
+    #endif
     #ifdef __SSE__
     _MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
     #ifdef _MM_SET_DENORMALS_ZERO_MODE

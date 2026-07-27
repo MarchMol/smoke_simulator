@@ -1,16 +1,22 @@
 # Compiler
 CC = gcc
 
-# Include and library paths
+# Include paths
 INCLUDE = -Iinclude
-LIBPATH = -Llib
 
-# Libraries to link
-LIBS = -lglfw3 -lopengl32 -lgdi32 -lglu32
-
-# Output executable
-OUT_SEQ = bin/main_seq.exe
-OUT_OMP = bin/main_omp.exe
+ifeq ($(OS),Windows_NT)
+    # Windows: use bundled import libs
+    LIBPATH = -Llib
+    LIBS = -lglfw3 -lopengl32 -lgdi32 -lglu32
+    OUT_SEQ = bin/main_seq.exe
+    OUT_OMP = bin/main_omp.exe
+else
+    # Linux: use system GLFW/OpenGL (install via e.g. `apt install libglfw3-dev`)
+    LIBPATH =
+    LIBS = -lglfw -lGL -lm -ldl -lpthread
+    OUT_SEQ = bin/main_seq
+    OUT_OMP = bin/main_omp
+endif
 
 # Flags
 CFLAGS      = -Ofast -march=native -ffast-math

@@ -1,7 +1,9 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#ifdef _WIN32
 #include <windows.h>
+#endif
 #include <math.h>
 #include "smoke.h"
 #include "data.h"

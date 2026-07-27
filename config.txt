@@ -4,7 +4,7 @@
 
 display_width = 1100
 display_height = 650
-grid_ratio = 0.3
+grid_ratio = 0.4
 
 
 #  ------    Sim Parameters    ------ #
@@ -19,12 +19,12 @@ conf_strenght = 1.0
 
 #  ------  Initial  Condition  ------ #
 
-# circle | square | random
+# circle | square | rsandom
 shape = circle
-amount_shapes = 10
+amount_shapes = 12
 emission_area = 0.1
 emission_rate = 0.8
-emmision_velocity_factor = 0.6
+emmision_velocity_factor =0.8
 
 
 #  ------    Visualization     ------ #

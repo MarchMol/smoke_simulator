@@ -7,7 +7,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#ifdef _WIN32
 #include <windows.h>
+#endif
 #include <time.h>
 #include "state.h"
 #include "data.h"
@@ -237,6 +239,9 @@ int render(
     #ifdef _WIN32
     _putenv_s("OMP_PROC_BIND","close");
     _putenv_s("OMP_PLACES","cores");
+    #else
+    setenv("OMP_PROC_BIND","close",1);
+    setenv("OMP_PLACES","cores",1);
     #endif
     omp_set_num_threads( choose_threads(data) ); 
     init_performance_monitor();
