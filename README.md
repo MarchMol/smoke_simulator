@@ -3,7 +3,7 @@
 ![Demo](demo.gif)
 
 ## Introduction
-This project is a screensaver that simulates smoke dissipating through a 2D medium, built first as a sequential implementation and then parallelized with OpenMP to compare performance. It uses an Eulerian grid method, discretizing the domain and applying per-cell operations — advection, diffusion, and pressure projection — that are naturally parallelizable across threads.
+This project is a screensaver that simulates smoke dissipating through a 2D medium, built first as a sequential implementation and then parallelized with OpenMP to compare performance. It uses an Eulerian grid method, discretizing the domain and applying per-cell operations: advection, diffusion, and pressure projection; that are naturally parallelizable across threads.
 
 Beyond producing an appealing visual effect, the goal is to apply parallel computing concepts in practice, using a classic fluid/gas dispersion problem to highlight the performance difference between a sequential and an optimized, multi-threaded approach.
 
